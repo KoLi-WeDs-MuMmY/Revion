@@ -1,0 +1,56 @@
+<resources>
+    <string name="app_name">GHICKIN</string>
+
+    <!-- Navigation Destinations -->
+    <string name="nav_home">Home</string>
+    <string name="nav_batches">Batches</string>
+    <string name="nav_vault">Vault</string>
+    <string name="nav_revision_quiz">Revision &amp; Quiz</string>
+    <string name="nav_flashcards">Flashcards</string>
+    <string name="nav_tutor_planner">Tutor &amp; Planner</string>
+    <string name="nav_brand_monogram_desc">GHICKIN workspace monogram</string>
+
+    <!-- Header & Dynamic Accent -->
+    <string name="header_greeting">Good morning, Scholar</string>
+    <string name="header_subtitle">16:9 AMOLED Study Command Center</string>
+    <string name="header_streak_label">14d Streak</string>
+    <string name="header_focus_ready">AI Focus Ready</string>
+    <string name="header_focus_calm">Deep Review Active</string>
+    <string name="header_accent_shift_label">Accent</string>
+    <string name="header_accent_cycle_desc">Cycle dynamic accent mood</string>
+
+    <!-- Accent Mood Names -->
+    <string name="accent_cyan">Cyan</string>
+    <string name="accent_violet">Violet</string>
+    <string name="accent_emerald">Emerald</string>
+    <string name="accent_amber">Amber</string>
+
+    <!-- Hero Daily Revision Card -->
+    <string name="hero_badge_ready">DAILY REVISION READY</string>
+    <string name="hero_title">Yesterday\'s Physics &amp; Biology Synthesis</string>
+    <string name="hero_subtitle">Structured from Gauss\'s Law &amp; Flux and DNA Replication notes logged yesterday. Ready for active recall and rapid synthesis checks.</string>
+    <string name="hero_cta_start">Start Daily Revision</string>
+    <string name="hero_metric_duration">18 min</string>
+    <string name="hero_metric_checks">12 checks</string>
+    <string name="hero_metric_retention">94% target</string>
+
+    <!-- Sections -->
+    <string name="section_subject_mastery">Subject Mastery</string>
+    <string name="section_subject_mastery_meta">4 Active Tracks</string>
+    <string name="section_yesterday_topics">Yesterday\'s Logged Topics</string>
+    <string name="section_yesterday_meta">4 Entries</string>
+    <string name="section_spaced_review">Upcoming Spaced Review</string>
+    <string name="section_spaced_meta">x-1 &amp; x-3 Queue</string>
+
+    <!-- Inspect Sheet -->
+    <string name="inspect_close_desc">Close inspect sheet</string>
+    <string name="inspect_key_focus">Key Focus Points</string>
+    <string name="inspect_phase_preview_note">Phase 1.1 interactive preview — jumping opens the destination workspace shell.</string>
+    <string name="inspect_open_tab_format">Open %1$s</string>
+
+    <!-- Phase Placeholders -->
+    <string name="placeholder_return_home">Return to Command Center</string>
+    <string name="placeholder_planned_modules">Planned Capabilities</string>
+    <string name="placeholder_test_accent">Test Dynamic Accent</string>
+    <string name="placeholder_status_blueprint">WORKSPACE SHELL READY</string>
+</resources>
