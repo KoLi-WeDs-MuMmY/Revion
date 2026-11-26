@@ -85,4 +85,35 @@
     <string name="vault_reader_close">Back to Vault</string>
     <string name="vault_reader_info_toggle">Details</string>
     <string name="vault_reader_mock_notice">Phase 1.2 visual reader deck — real PDF engine plugs in during Phase 2.</string>
+
+    <!-- Phase 1.3: Daily Revision Notes & Conceptual Diagrams -->
+    <string name="revision_mode_notes">Revision Notes</string>
+    <string name="revision_mode_quiz">Subject Quiz</string>
+    <string name="revision_source_header">Generated from Yesterday\'s Study Log</string>
+    <string name="revision_compound_mix">Compound Revision Mix</string>
+    <string name="revision_compound_desc">Blend high-yield traps across Physics, Chemistry &amp; Biology</string>
+    <string name="revision_export_pdf">Export Revision PDF</string>
+    <string name="revision_export_snackbar">Revision PDF queued (mock) — real PDF export arrives in Phase 2.</string>
+    <string name="revision_diagram_badge">CONCEPTUAL DIAGRAM</string>
+    <string name="revision_labels_show">Show Labels</string>
+    <string name="revision_labels_hide">Hide Labels</string>
+    <string name="revision_formulas_header">Key Formulas &amp; Definitions</string>
+    <string name="revision_concepts_header">Structured Concept Breakdown</string>
+
+    <!-- Phase 1.3: Interactive Subject Quiz & Weak-Topic Breakdown -->
+    <string name="quiz_mode_normal">Normal Mode</string>
+    <string name="quiz_mode_exam">Exam Mode</string>
+    <string name="quiz_mode_normal_hint">Instant feedback &amp; explanation after every answer</string>
+    <string name="quiz_mode_exam_hint">No spoilers during quiz — graded with explanations after submit</string>
+    <string name="quiz_next_question">Next Question</string>
+    <string name="quiz_submit_exam">Submit Quiz</string>
+    <string name="quiz_explanation_label">CONCEPT EXPLANATION</string>
+    <string name="quiz_weak_topics_header">Weak-Topic Breakdown</string>
+    <string name="quiz_fix_video_badge">Bite-Sized Fix Video (Coming in Phase 3)</string>
+    <string name="quiz_all_clear_title">Zero Weak Topics Detected</string>
+    <string name="quiz_all_clear_subtitle">Every subtopic in this set cleared with full accuracy.</string>
+    <string name="quiz_answer_review_header">Submitted Answers &amp; Explanations</string>
+    <string name="quiz_action_retry_missed">Retry Missed</string>
+    <string name="quiz_action_jump_revision">Jump to Revision Notes</string>
+    <string name="quiz_action_retake_full">Retake Full Quiz</string>
 </resources>

@@ -27,11 +27,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.model.InspectSelection
 import com.example.model.PresetSubjectTemplate
+import com.example.model.QuizMode
+import com.example.model.RevisionQuizTabMode
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.ui.batches.BatchesScreen
 import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
+import com.example.ui.revision.RevisionQuizHubScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.vault.VaultScreen
@@ -72,6 +75,18 @@ fun WorkspaceShell(
     onToggleReaderInfo: () -> Unit,
     onStepReaderPage: (Int) -> Unit,
     onJumpReaderToPage: (Int) -> Unit,
+    // Phase 1.3 Revision & Quiz callbacks
+    onSelectRevisionQuizMode: (RevisionQuizTabMode) -> Unit,
+    onSelectRevisionSubject: (String) -> Unit,
+    onToggleCompoundRevisionMix: () -> Unit,
+    onToggleDiagramLabels: () -> Unit,
+    onSelectQuizMode: (QuizMode) -> Unit,
+    onSelectQuizSubject: (String) -> Unit,
+    onSelectQuizOption: (questionId: String, optionIndex: Int, elapsedSeconds: Int) -> Unit,
+    onAdvanceOrSubmitQuiz: (elapsedSeconds: Int) -> Unit,
+    onRetryMissedQuestions: () -> Unit,
+    onRetakeFullQuiz: () -> Unit,
+    onJumpFromQuizToRevision: (preferredSubjectId: String?) -> Unit,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,6 +154,17 @@ fun WorkspaceShell(
                         onToggleReaderInfo = onToggleReaderInfo,
                         onStepReaderPage = onStepReaderPage,
                         onJumpReaderToPage = onJumpReaderToPage,
+                        onSelectRevisionQuizMode = onSelectRevisionQuizMode,
+                        onSelectRevisionSubject = onSelectRevisionSubject,
+                        onToggleCompoundRevisionMix = onToggleCompoundRevisionMix,
+                        onToggleDiagramLabels = onToggleDiagramLabels,
+                        onSelectQuizMode = onSelectQuizMode,
+                        onSelectQuizSubject = onSelectQuizSubject,
+                        onSelectQuizOption = onSelectQuizOption,
+                        onAdvanceOrSubmitQuiz = onAdvanceOrSubmitQuiz,
+                        onRetryMissedQuestions = onRetryMissedQuestions,
+                        onRetakeFullQuiz = onRetakeFullQuiz,
+                        onJumpFromQuizToRevision = onJumpFromQuizToRevision,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -184,6 +210,17 @@ fun WorkspaceShell(
                         onToggleReaderInfo = onToggleReaderInfo,
                         onStepReaderPage = onStepReaderPage,
                         onJumpReaderToPage = onJumpReaderToPage,
+                        onSelectRevisionQuizMode = onSelectRevisionQuizMode,
+                        onSelectRevisionSubject = onSelectRevisionSubject,
+                        onToggleCompoundRevisionMix = onToggleCompoundRevisionMix,
+                        onToggleDiagramLabels = onToggleDiagramLabels,
+                        onSelectQuizMode = onSelectQuizMode,
+                        onSelectQuizSubject = onSelectQuizSubject,
+                        onSelectQuizOption = onSelectQuizOption,
+                        onAdvanceOrSubmitQuiz = onAdvanceOrSubmitQuiz,
+                        onRetryMissedQuestions = onRetryMissedQuestions,
+                        onRetakeFullQuiz = onRetakeFullQuiz,
+                        onJumpFromQuizToRevision = onJumpFromQuizToRevision,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -231,6 +268,17 @@ private fun WorkspaceStage(
     onToggleReaderInfo: () -> Unit,
     onStepReaderPage: (Int) -> Unit,
     onJumpReaderToPage: (Int) -> Unit,
+    onSelectRevisionQuizMode: (RevisionQuizTabMode) -> Unit,
+    onSelectRevisionSubject: (String) -> Unit,
+    onToggleCompoundRevisionMix: () -> Unit,
+    onToggleDiagramLabels: () -> Unit,
+    onSelectQuizMode: (QuizMode) -> Unit,
+    onSelectQuizSubject: (String) -> Unit,
+    onSelectQuizOption: (questionId: String, optionIndex: Int, elapsedSeconds: Int) -> Unit,
+    onAdvanceOrSubmitQuiz: (elapsedSeconds: Int) -> Unit,
+    onRetryMissedQuestions: () -> Unit,
+    onRetakeFullQuiz: () -> Unit,
+    onJumpFromQuizToRevision: (preferredSubjectId: String?) -> Unit,
     onReturnHome: () -> Unit,
 ) {
     val spatialSpring = spring<IntOffset>(
@@ -295,6 +343,22 @@ private fun WorkspaceStage(
                 onToggleReaderInfo = onToggleReaderInfo,
                 onStepReaderPage = onStepReaderPage,
                 onJumpReaderToPage = onJumpReaderToPage,
+            )
+
+            WorkspaceTab.REVISION_QUIZ -> RevisionQuizHubScreen(
+                state = uiState.revisionQuizState,
+                isWideLayout = isWideLayout,
+                onSelectMode = onSelectRevisionQuizMode,
+                onSelectRevisionSubject = onSelectRevisionSubject,
+                onToggleCompoundMix = onToggleCompoundRevisionMix,
+                onToggleDiagramLabels = onToggleDiagramLabels,
+                onSelectQuizMode = onSelectQuizMode,
+                onSelectQuizSubject = onSelectQuizSubject,
+                onSelectQuizOption = onSelectQuizOption,
+                onAdvanceOrSubmitQuiz = onAdvanceOrSubmitQuiz,
+                onRetryMissedQuestions = onRetryMissedQuestions,
+                onRetakeFullQuiz = onRetakeFullQuiz,
+                onJumpFromQuizToRevision = onJumpFromQuizToRevision,
             )
 
             else -> PhasePlaceholderScreen(

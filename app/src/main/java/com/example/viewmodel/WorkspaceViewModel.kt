@@ -10,7 +10,11 @@ import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
 import com.example.model.MaterialType
 import com.example.model.Phase12MockData
+import com.example.model.Phase13MockData
 import com.example.model.PresetSubjectTemplate
+import com.example.model.QuizMode
+import com.example.model.RevisionQuizTabMode
+import com.example.model.RevisionQuizUiState
 import com.example.model.SpacedReviewItem
 import com.example.model.StudyBatch
 import com.example.model.SubjectMastery
@@ -394,6 +398,198 @@ class WorkspaceViewModel : ViewModel() {
         }
     }
 
+    // --- Phase 1.3 Daily Revision Notes & Dual-Mode Subject Quiz Actions ---
+
+    fun selectRevisionQuizMode(mode: RevisionQuizTabMode) {
+        _uiState.update { state ->
+            state.copy(
+                revisionQuizState = state.revisionQuizState.copy(activeMode = mode),
+            )
+        }
+    }
+
+    fun selectRevisionSubject(subjectId: String) {
+        _uiState.update { state ->
+            state.copy(
+                revisionQuizState = state.revisionQuizState.copy(
+                    selectedRevisionSubjectId = subjectId,
+                    isCompoundMixEnabled = false,
+                ),
+            )
+        }
+    }
+
+    fun toggleCompoundRevisionMix() {
+        _uiState.update { state ->
+            state.copy(
+                revisionQuizState = state.revisionQuizState.copy(
+                    isCompoundMixEnabled = !state.revisionQuizState.isCompoundMixEnabled,
+                ),
+            )
+        }
+    }
+
+    fun toggleDiagramLabels() {
+        _uiState.update { state ->
+            state.copy(
+                revisionQuizState = state.revisionQuizState.copy(
+                    showDiagramLabels = !state.revisionQuizState.showDiagramLabels,
+                ),
+            )
+        }
+    }
+
+    fun selectQuizMode(mode: QuizMode) {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val questionIds = Phase13MockData.questionIdsForSubject(
+                current.allQuestions,
+                current.selectedQuizSubjectId,
+            )
+            state.copy(
+                revisionQuizState = current.copy(
+                    quizMode = mode,
+                    activeQuestionIds = questionIds,
+                    currentQuestionIndex = 0,
+                    selectedAnswers = emptyMap(),
+                    questionElapsedSeconds = emptyMap(),
+                    isQuizSubmitted = false,
+                    isRetryMissedSession = false,
+                    sessionNonce = current.sessionNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun selectQuizSubject(subjectId: String) {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val questionIds = Phase13MockData.questionIdsForSubject(current.allQuestions, subjectId)
+            state.copy(
+                revisionQuizState = current.copy(
+                    selectedQuizSubjectId = subjectId,
+                    activeQuestionIds = questionIds,
+                    currentQuestionIndex = 0,
+                    selectedAnswers = emptyMap(),
+                    questionElapsedSeconds = emptyMap(),
+                    isQuizSubmitted = false,
+                    isRetryMissedSession = false,
+                    sessionNonce = current.sessionNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun selectQuizOption(questionId: String, optionIndex: Int, elapsedSeconds: Int) {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            if (current.isQuizSubmitted) return@update state
+            // In Normal Mode, once answered the choice is locked to reveal instant explanation
+            if (current.quizMode == QuizMode.NORMAL && current.selectedAnswers.containsKey(questionId)) {
+                return@update state
+            }
+            val updatedAnswers = current.selectedAnswers + (questionId to optionIndex)
+            val updatedTimes = if (current.quizMode == QuizMode.NORMAL) {
+                current.questionElapsedSeconds + (questionId to elapsedSeconds)
+            } else {
+                current.questionElapsedSeconds
+            }
+            state.copy(
+                revisionQuizState = current.copy(
+                    selectedAnswers = updatedAnswers,
+                    questionElapsedSeconds = updatedTimes,
+                ),
+            )
+        }
+    }
+
+    fun advanceOrSubmitQuiz(currentQuestionElapsedSeconds: Int) {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val question = current.currentQuestion ?: return@update state
+            val recordedTimes = if (current.questionElapsedSeconds.containsKey(question.id)) {
+                current.questionElapsedSeconds
+            } else {
+                current.questionElapsedSeconds + (question.id to currentQuestionElapsedSeconds)
+            }
+            val isLast = current.currentQuestionIndex >= current.activeQuestionIds.lastIndex
+            if (isLast) {
+                state.copy(
+                    revisionQuizState = current.copy(
+                        questionElapsedSeconds = recordedTimes,
+                        isQuizSubmitted = true,
+                    ),
+                )
+            } else {
+                state.copy(
+                    revisionQuizState = current.copy(
+                        questionElapsedSeconds = recordedTimes,
+                        currentQuestionIndex = current.currentQuestionIndex + 1,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun retryMissedQuestions() {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val missedIds = current.missedQuestions.map { it.id }
+            if (missedIds.isEmpty()) return@update state
+            state.copy(
+                revisionQuizState = current.copy(
+                    activeQuestionIds = missedIds,
+                    currentQuestionIndex = 0,
+                    selectedAnswers = emptyMap(),
+                    questionElapsedSeconds = emptyMap(),
+                    isQuizSubmitted = false,
+                    isRetryMissedSession = true,
+                    sessionNonce = current.sessionNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun retakeFullQuiz() {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val fullIds = Phase13MockData.questionIdsForSubject(
+                current.allQuestions,
+                current.selectedQuizSubjectId,
+            )
+            state.copy(
+                revisionQuizState = current.copy(
+                    activeQuestionIds = fullIds,
+                    currentQuestionIndex = 0,
+                    selectedAnswers = emptyMap(),
+                    questionElapsedSeconds = emptyMap(),
+                    isQuizSubmitted = false,
+                    isRetryMissedSession = false,
+                    sessionNonce = current.sessionNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun jumpFromQuizToRevisionNotes(preferredSubjectId: String?) {
+        _uiState.update { state ->
+            val current = state.revisionQuizState
+            val targetId = preferredSubjectId ?: current.selectedQuizSubjectId
+            val useCompound = targetId == Phase13MockData.SUBJECT_COMPOUND_ID
+            state.copy(
+                revisionQuizState = current.copy(
+                    activeMode = RevisionQuizTabMode.REVISION_NOTES,
+                    isCompoundMixEnabled = useCompound,
+                    selectedRevisionSubjectId = if (useCompound) {
+                        current.selectedRevisionSubjectId
+                    } else {
+                        targetId
+                    },
+                ),
+            )
+        }
+    }
+
     // --- Layered Back Navigation ---
 
     fun navigateBackToHome() {
@@ -619,6 +815,9 @@ class WorkspaceViewModel : ViewModel() {
 
         val initialBatches = Phase12MockData.createInitialBatches()
         val firstBatch = initialBatches.first()
+        val initialRevisionSheets = Phase13MockData.createRevisionSheets()
+        val initialQuizQuestions = Phase13MockData.createQuizQuestions()
+        val defaultQuizSubject = Phase13MockData.SUBJECT_PHYSICS_ID
 
         return WorkspaceUiState(
             activeTab = WorkspaceTab.HOME,
@@ -639,6 +838,21 @@ class WorkspaceViewModel : ViewModel() {
             vaultState = VaultUiState(
                 materials = Phase12MockData.createInitialVaultMaterials(),
                 previewedMaterialId = "mat_phys_gauss_pdf",
+            ),
+            revisionQuizState = RevisionQuizUiState(
+                activeMode = RevisionQuizTabMode.REVISION_NOTES,
+                revisionSheets = initialRevisionSheets,
+                compoundMixSheet = Phase13MockData.createCompoundMixSheet(),
+                selectedRevisionSubjectId = Phase13MockData.SUBJECT_PHYSICS_ID,
+                isCompoundMixEnabled = false,
+                showDiagramLabels = true,
+                allQuestions = initialQuizQuestions,
+                quizMode = QuizMode.NORMAL,
+                selectedQuizSubjectId = defaultQuizSubject,
+                activeQuestionIds = Phase13MockData.questionIdsForSubject(
+                    initialQuizQuestions,
+                    defaultQuizSubject,
+                ),
             ),
         )
     }

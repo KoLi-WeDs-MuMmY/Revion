@@ -199,4 +199,5 @@ data class WorkspaceUiState(
     val inspectSelection: InspectSelection? = null,
     val batchesState: BatchesUiState,
     val vaultState: VaultUiState,
+    val revisionQuizState: RevisionQuizUiState,
 )

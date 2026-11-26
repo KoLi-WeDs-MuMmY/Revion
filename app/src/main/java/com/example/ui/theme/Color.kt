@@ -20,6 +20,12 @@ val HairlineRest = Color(0x14FFFFFF) // ~8% white anodized edge
 val HairlineSubtle = Color(0x0DFFFFFF) // ~5% divider
 val HairlineSpecularTop = Color(0x22FFFFFF) // subtle top light catch
 
+// Semantic Quiz Feedback Tokens (Restrained Editorial Contrast — Zero Neon)
+val FeedbackCorrect = Color(0xFF34D399)
+val FeedbackCorrectContainer = Color(0xFF0B2820)
+val FeedbackIncorrect = Color(0xFFF87171)
+val FeedbackIncorrectContainer = Color(0xFF2B1216)
+
 // Refined Curated Multi-Color Dynamic Accents (Mineral / Editorial Tones — Non-Neon)
 enum class AccentMood(
     val id: String,

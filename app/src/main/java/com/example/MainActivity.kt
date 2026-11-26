@@ -52,6 +52,17 @@ class MainActivity : ComponentActivity() {
                     onToggleReaderInfo = workspaceViewModel::toggleReaderInfoDrawer,
                     onStepReaderPage = workspaceViewModel::stepReaderPage,
                     onJumpReaderToPage = workspaceViewModel::jumpReaderToPage,
+                    onSelectRevisionQuizMode = workspaceViewModel::selectRevisionQuizMode,
+                    onSelectRevisionSubject = workspaceViewModel::selectRevisionSubject,
+                    onToggleCompoundRevisionMix = workspaceViewModel::toggleCompoundRevisionMix,
+                    onToggleDiagramLabels = workspaceViewModel::toggleDiagramLabels,
+                    onSelectQuizMode = workspaceViewModel::selectQuizMode,
+                    onSelectQuizSubject = workspaceViewModel::selectQuizSubject,
+                    onSelectQuizOption = workspaceViewModel::selectQuizOption,
+                    onAdvanceOrSubmitQuiz = workspaceViewModel::advanceOrSubmitQuiz,
+                    onRetryMissedQuestions = workspaceViewModel::retryMissedQuestions,
+                    onRetakeFullQuiz = workspaceViewModel::retakeFullQuiz,
+                    onJumpFromQuizToRevision = workspaceViewModel::jumpFromQuizToRevisionNotes,
                     onNavigateBackToHome = workspaceViewModel::navigateBackToHome,
                 )
             }
