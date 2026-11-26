@@ -63,6 +63,16 @@ class MainActivity : ComponentActivity() {
                     onRetryMissedQuestions = workspaceViewModel::retryMissedQuestions,
                     onRetakeFullQuiz = workspaceViewModel::retakeFullQuiz,
                     onJumpFromQuizToRevision = workspaceViewModel::jumpFromQuizToRevisionNotes,
+                    onSelectFlashcardHubMode = workspaceViewModel::selectFlashcardHubMode,
+                    onSelectSpacedBucket = workspaceViewModel::selectSpacedBucket,
+                    onSelectFlashcardSubjectFilter = workspaceViewModel::selectFlashcardSubjectFilter,
+                    onToggleFlashcardFlip = workspaceViewModel::toggleFlashcardFlip,
+                    onRateFlashcard = workspaceViewModel::rateFlashcard,
+                    onResetFlashcardSession = workspaceViewModel::resetFlashcardSession,
+                    onSelectMistakeCategoryFilter = workspaceViewModel::selectMistakeCategoryFilter,
+                    onSelectMistakeSubjectFilter = workspaceViewModel::selectMistakeSubjectFilter,
+                    onSelectMistakeRecord = workspaceViewModel::selectMistakeRecord,
+                    onSendMistakeToWeekendDeck = workspaceViewModel::sendMistakeToWeekendHardDeck,
                     onNavigateBackToHome = workspaceViewModel::navigateBackToHome,
                 )
             }

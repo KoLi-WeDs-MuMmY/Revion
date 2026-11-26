@@ -23,15 +23,22 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.model.FlashcardHubMode
+import com.example.model.FlashcardRating
 import com.example.model.InspectSelection
+import com.example.model.MistakeCategory
 import com.example.model.PresetSubjectTemplate
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
+import com.example.model.SpacedIntervalBucket
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.ui.batches.BatchesScreen
+import com.example.ui.components.AmbientMineralBackdrop
+import com.example.ui.flashcards.FlashcardsHubScreen
 import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
 import com.example.ui.revision.RevisionQuizHubScreen
@@ -87,6 +94,17 @@ fun WorkspaceShell(
     onRetryMissedQuestions: () -> Unit,
     onRetakeFullQuiz: () -> Unit,
     onJumpFromQuizToRevision: (preferredSubjectId: String?) -> Unit,
+    // Phase 1.4 Spaced Flashcards & Mistake Bank callbacks
+    onSelectFlashcardHubMode: (FlashcardHubMode) -> Unit,
+    onSelectSpacedBucket: (SpacedIntervalBucket) -> Unit,
+    onSelectFlashcardSubjectFilter: (String?) -> Unit,
+    onToggleFlashcardFlip: () -> Unit,
+    onRateFlashcard: (cardId: String, rating: FlashcardRating) -> Unit,
+    onResetFlashcardSession: () -> Unit,
+    onSelectMistakeCategoryFilter: (MistakeCategory?) -> Unit,
+    onSelectMistakeSubjectFilter: (String?) -> Unit,
+    onSelectMistakeRecord: (String?) -> Unit,
+    onSendMistakeToWeekendDeck: (String) -> Unit,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -106,11 +124,17 @@ fun WorkspaceShell(
     ) {
         val isWideLayout = maxWidth >= 640.dp || maxWidth > maxHeight
 
+        // Whisper-soft drifting mineral light wash on pure #000000 AMOLED void (non-neon)
+        AmbientMineralBackdrop(
+            accentMood = uiState.accentMood,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         if (isWideLayout) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(tokens.amoledBackground),
+                    .background(Color.Transparent),
             ) {
                 GhickinNavRail(
                     activeTab = uiState.activeTab,
@@ -165,6 +189,16 @@ fun WorkspaceShell(
                         onRetryMissedQuestions = onRetryMissedQuestions,
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onJumpFromQuizToRevision = onJumpFromQuizToRevision,
+                        onSelectFlashcardHubMode = onSelectFlashcardHubMode,
+                        onSelectSpacedBucket = onSelectSpacedBucket,
+                        onSelectFlashcardSubjectFilter = onSelectFlashcardSubjectFilter,
+                        onToggleFlashcardFlip = onToggleFlashcardFlip,
+                        onRateFlashcard = onRateFlashcard,
+                        onResetFlashcardSession = onResetFlashcardSession,
+                        onSelectMistakeCategoryFilter = onSelectMistakeCategoryFilter,
+                        onSelectMistakeSubjectFilter = onSelectMistakeSubjectFilter,
+                        onSelectMistakeRecord = onSelectMistakeRecord,
+                        onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -173,7 +207,7 @@ fun WorkspaceShell(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(tokens.amoledBackground),
+                    .background(Color.Transparent),
             ) {
                 Box(
                     modifier = Modifier
@@ -221,6 +255,16 @@ fun WorkspaceShell(
                         onRetryMissedQuestions = onRetryMissedQuestions,
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onJumpFromQuizToRevision = onJumpFromQuizToRevision,
+                        onSelectFlashcardHubMode = onSelectFlashcardHubMode,
+                        onSelectSpacedBucket = onSelectSpacedBucket,
+                        onSelectFlashcardSubjectFilter = onSelectFlashcardSubjectFilter,
+                        onToggleFlashcardFlip = onToggleFlashcardFlip,
+                        onRateFlashcard = onRateFlashcard,
+                        onResetFlashcardSession = onResetFlashcardSession,
+                        onSelectMistakeCategoryFilter = onSelectMistakeCategoryFilter,
+                        onSelectMistakeSubjectFilter = onSelectMistakeSubjectFilter,
+                        onSelectMistakeRecord = onSelectMistakeRecord,
+                        onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -279,6 +323,16 @@ private fun WorkspaceStage(
     onRetryMissedQuestions: () -> Unit,
     onRetakeFullQuiz: () -> Unit,
     onJumpFromQuizToRevision: (preferredSubjectId: String?) -> Unit,
+    onSelectFlashcardHubMode: (FlashcardHubMode) -> Unit,
+    onSelectSpacedBucket: (SpacedIntervalBucket) -> Unit,
+    onSelectFlashcardSubjectFilter: (String?) -> Unit,
+    onToggleFlashcardFlip: () -> Unit,
+    onRateFlashcard: (cardId: String, rating: FlashcardRating) -> Unit,
+    onResetFlashcardSession: () -> Unit,
+    onSelectMistakeCategoryFilter: (MistakeCategory?) -> Unit,
+    onSelectMistakeSubjectFilter: (String?) -> Unit,
+    onSelectMistakeRecord: (String?) -> Unit,
+    onSendMistakeToWeekendDeck: (String) -> Unit,
     onReturnHome: () -> Unit,
 ) {
     val spatialSpring = spring<IntOffset>(
@@ -359,6 +413,21 @@ private fun WorkspaceStage(
                 onRetryMissedQuestions = onRetryMissedQuestions,
                 onRetakeFullQuiz = onRetakeFullQuiz,
                 onJumpFromQuizToRevision = onJumpFromQuizToRevision,
+            )
+
+            WorkspaceTab.FLASHCARDS -> FlashcardsHubScreen(
+                state = uiState.flashcardsState,
+                isWideLayout = isWideLayout,
+                onSelectMode = onSelectFlashcardHubMode,
+                onSelectBucket = onSelectSpacedBucket,
+                onSelectCardSubjectFilter = onSelectFlashcardSubjectFilter,
+                onToggleCardFlip = onToggleFlashcardFlip,
+                onRateCard = onRateFlashcard,
+                onResetCardSession = onResetFlashcardSession,
+                onSelectMistakeCategory = onSelectMistakeCategoryFilter,
+                onSelectMistakeSubject = onSelectMistakeSubjectFilter,
+                onSelectMistakeRecord = onSelectMistakeRecord,
+                onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
             )
 
             else -> PhasePlaceholderScreen(

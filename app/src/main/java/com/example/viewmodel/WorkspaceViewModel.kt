@@ -5,16 +5,23 @@ import com.example.model.BatchChapter
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
 import com.example.model.DailyRevisionBrief
+import com.example.model.FlashcardHubMode
+import com.example.model.FlashcardRating
+import com.example.model.FlashcardsMistakesUiState
 import com.example.model.FocusMode
 import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
 import com.example.model.MaterialType
+import com.example.model.MistakeCategory
 import com.example.model.Phase12MockData
 import com.example.model.Phase13MockData
+import com.example.model.Phase14MockData
 import com.example.model.PresetSubjectTemplate
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
 import com.example.model.RevisionQuizUiState
+import com.example.model.SpacedFlashcard
+import com.example.model.SpacedIntervalBucket
 import com.example.model.SpacedReviewItem
 import com.example.model.StudyBatch
 import com.example.model.SubjectMastery
@@ -590,6 +597,169 @@ class WorkspaceViewModel : ViewModel() {
         }
     }
 
+    // --- Phase 1.4 Spaced Flashcards & Mistake Bank Actions ---
+
+    fun selectFlashcardHubMode(mode: FlashcardHubMode) {
+        _uiState.update { state ->
+            state.copy(
+                flashcardsState = state.flashcardsState.copy(activeMode = mode),
+            )
+        }
+    }
+
+    fun selectSpacedBucket(bucket: SpacedIntervalBucket) {
+        _uiState.update { state ->
+            state.copy(
+                flashcardsState = state.flashcardsState.copy(
+                    activeBucket = bucket,
+                    isCardFlipped = false,
+                    deckNonce = state.flashcardsState.deckNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun selectFlashcardSubjectFilter(subjectName: String?) {
+        _uiState.update { state ->
+            state.copy(
+                flashcardsState = state.flashcardsState.copy(
+                    selectedCardSubject = subjectName,
+                    isCardFlipped = false,
+                    deckNonce = state.flashcardsState.deckNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun toggleFlashcardFlip() {
+        _uiState.update { state ->
+            state.copy(
+                flashcardsState = state.flashcardsState.copy(
+                    isCardFlipped = !state.flashcardsState.isCardFlipped,
+                ),
+            )
+        }
+    }
+
+    fun rateFlashcard(cardId: String, rating: FlashcardRating) {
+        _uiState.update { state ->
+            val current = state.flashcardsState
+            val updatedGood = if (rating == FlashcardRating.GOOD || rating == FlashcardRating.EASY) {
+                current.goodOrEasyCount + 1
+            } else {
+                current.goodOrEasyCount
+            }
+            val updatedHard = if (rating == FlashcardRating.AGAIN || rating == FlashcardRating.HARD) {
+                current.hardOrAgainCount + 1
+            } else {
+                current.hardOrAgainCount
+            }
+
+            // "Again" pushes card to back of current session queue; Hard/Good/Easy marks reviewed
+            val updatedCompleted = if (rating == FlashcardRating.AGAIN) {
+                current.completedCardIds - cardId
+            } else {
+                current.completedCardIds + cardId
+            }
+            val updatedRequeued = if (rating == FlashcardRating.AGAIN) {
+                (current.requeuedCardIds - cardId) + cardId
+            } else {
+                current.requeuedCardIds - cardId
+            }
+
+            state.copy(
+                flashcardsState = current.copy(
+                    completedCardIds = updatedCompleted,
+                    requeuedCardIds = updatedRequeued,
+                    isCardFlipped = false,
+                    goodOrEasyCount = updatedGood,
+                    hardOrAgainCount = updatedHard,
+                    deckNonce = current.deckNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun resetFlashcardSession() {
+        _uiState.update { state ->
+            val current = state.flashcardsState
+            val bucketCardIds = current.cardsInBucket(current.activeBucket, current.selectedCardSubject)
+                .map { it.id }
+                .toSet()
+            state.copy(
+                flashcardsState = current.copy(
+                    completedCardIds = current.completedCardIds - bucketCardIds,
+                    requeuedCardIds = current.requeuedCardIds.filterNot { it in bucketCardIds },
+                    isCardFlipped = false,
+                    deckNonce = current.deckNonce + 1,
+                ),
+            )
+        }
+    }
+
+    fun selectMistakeCategoryFilter(category: MistakeCategory?) {
+        _uiState.update { state ->
+            val updated = state.flashcardsState.copy(selectedMistakeCategory = category)
+            state.copy(
+                flashcardsState = updated.copy(
+                    selectedMistakeId = updated.filteredMistakes.firstOrNull()?.id,
+                ),
+            )
+        }
+    }
+
+    fun selectMistakeSubjectFilter(subjectName: String?) {
+        _uiState.update { state ->
+            val updated = state.flashcardsState.copy(selectedMistakeSubject = subjectName)
+            state.copy(
+                flashcardsState = updated.copy(
+                    selectedMistakeId = updated.filteredMistakes.firstOrNull()?.id,
+                ),
+            )
+        }
+    }
+
+    fun selectMistakeRecord(mistakeId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                flashcardsState = state.flashcardsState.copy(selectedMistakeId = mistakeId),
+            )
+        }
+    }
+
+    fun sendMistakeToWeekendHardDeck(mistakeId: String) {
+        _uiState.update { state ->
+            val current = state.flashcardsState
+            val target = current.mistakes.firstOrNull { it.id == mistakeId } ?: return@update state
+            if (target.addedToWeekendDeck) return@update state
+
+            val promotedCard = SpacedFlashcard(
+                id = "fc_from_mistake_${target.id}",
+                bucket = SpacedIntervalBucket.WEEKEND_HARD,
+                subjectName = target.subjectName,
+                accentMood = target.accentMood,
+                chapterTag = target.chapterTitle,
+                intervalLabel = "WKND",
+                frontPrompt = target.questionSummary,
+                backAnswer = target.correctConcept,
+                formulaOrHint = target.formulaAnchor,
+                trapNote = "Previous Mistake (${target.category.label}): ${target.wrongPick}",
+            )
+
+            val updatedMistakes = current.mistakes.map { item ->
+                if (item.id == mistakeId) item.copy(addedToWeekendDeck = true) else item
+            }
+
+            state.copy(
+                flashcardsState = current.copy(
+                    mistakes = updatedMistakes,
+                    allCards = listOf(promotedCard) + current.allCards,
+                    completedCardIds = current.completedCardIds - promotedCard.id,
+                ),
+            )
+        }
+    }
+
     // --- Layered Back Navigation ---
 
     fun navigateBackToHome() {
@@ -853,6 +1023,13 @@ class WorkspaceViewModel : ViewModel() {
                     initialQuizQuestions,
                     defaultQuizSubject,
                 ),
+            ),
+            flashcardsState = FlashcardsMistakesUiState(
+                activeMode = FlashcardHubMode.FLASHCARD_DECK,
+                allCards = Phase14MockData.createInitialFlashcards(),
+                activeBucket = SpacedIntervalBucket.TODAY_X1,
+                mistakes = Phase14MockData.createInitialMistakes(),
+                selectedMistakeId = Phase14MockData.createInitialMistakes().firstOrNull()?.id,
             ),
         )
     }

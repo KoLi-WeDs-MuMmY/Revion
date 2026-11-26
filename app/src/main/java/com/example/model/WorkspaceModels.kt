@@ -200,4 +200,5 @@ data class WorkspaceUiState(
     val batchesState: BatchesUiState,
     val vaultState: VaultUiState,
     val revisionQuizState: RevisionQuizUiState,
+    val flashcardsState: FlashcardsMistakesUiState,
 )

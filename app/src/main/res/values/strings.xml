@@ -116,4 +116,27 @@
     <string name="quiz_action_retry_missed">Retry Missed</string>
     <string name="quiz_action_jump_revision">Jump to Revision Notes</string>
     <string name="quiz_action_retake_full">Retake Full Quiz</string>
+
+    <!-- Phase 1.4: Spaced Flashcards & Mistake Bank -->
+    <string name="flashcards_hub_title">Flashcards &amp; Mistakes</string>
+    <string name="flashcards_hub_subtitle">Spaced recall (x-1, x-3, weekend hard topics) &amp; targeted error triage</string>
+    <string name="flashcards_mode_deck">Flashcard Deck</string>
+    <string name="flashcards_mode_mistakes">Mistake Bank</string>
+    <string name="flashcards_due_remaining">Cards Remaining</string>
+    <string name="flashcards_session_mastery">Session Recall</string>
+    <string name="flashcards_tap_to_flip">Tap card to flip · Swipe left (Hard) or right (Good)</string>
+    <string name="flashcards_tap_to_front">Tap card to view prompt · Rate below or swipe</string>
+    <string name="flashcards_formula_hint_label">FORMULA / MNEMONIC ANCHOR</string>
+    <string name="flashcards_session_complete_title">Spaced Queue Cleared</string>
+    <string name="flashcards_session_complete_subtitle">All scheduled cards in this interval deck have been reviewed.</string>
+    <string name="flashcards_reset_session">Reset Deck Session</string>
+
+    <string name="mistakes_inspector_badge">ERROR AUTOPSY</string>
+    <string name="mistakes_wrong_pick_label">YOUR WRONG PICK</string>
+    <string name="mistakes_correct_concept_label">CORRECT CONCEPT</string>
+    <string name="mistakes_send_weekend_cta">Send to Weekend Hard Deck</string>
+    <string name="mistakes_sent_weekend_cta">Queued in Weekend Hard Deck</string>
+    <string name="mistakes_sent_snackbar">Added to Weekend Hard Parts flashcard deck.</string>
+    <string name="mistakes_empty_title">No mistakes in this filter</string>
+    <string name="mistakes_empty_subtitle">Switch category or subject filters to inspect other logged traps.</string>
 </resources>

@@ -29,6 +29,58 @@ val JetBrainsMonoFamily = FontFamily(
     Font(R.font.jetbrains_mono, FontWeight.Bold),
 )
 
+val KineticDisplayXL = TextStyle(
+    fontFamily = SpaceGroteskFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 44.sp,
+    lineHeight = 48.sp,
+    letterSpacing = (-1.4).sp,
+    fontFeatureSettings = "tnum",
+)
+
+val KineticDisplayLarge = TextStyle(
+    fontFamily = SpaceGroteskFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 32.sp,
+    lineHeight = 36.sp,
+    letterSpacing = (-0.9).sp,
+    fontFeatureSettings = "tnum",
+)
+
+val FlashcardPromptDisplay = TextStyle(
+    fontFamily = SpaceGroteskFamily,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 22.sp,
+    lineHeight = 30.sp,
+    letterSpacing = (-0.35).sp,
+)
+
+val HumanistReadingBody = TextStyle(
+    fontFamily = InterFamily,
+    fontWeight = FontWeight.Normal,
+    fontSize = 15.sp,
+    lineHeight = 23.sp,
+    letterSpacing = 0.05.sp,
+)
+
+val FormulaMonoDisplay = TextStyle(
+    fontFamily = JetBrainsMonoFamily,
+    fontWeight = FontWeight.Medium,
+    fontSize = 14.5.sp,
+    lineHeight = 21.sp,
+    letterSpacing = (-0.1).sp,
+    fontFeatureSettings = "tnum",
+)
+
+val MicroTagMono = TextStyle(
+    fontFamily = JetBrainsMonoFamily,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 10.sp,
+    lineHeight = 13.sp,
+    letterSpacing = 0.85.sp,
+    fontFeatureSettings = "tnum",
+)
+
 val MonoMetricLarge = TextStyle(
     fontFamily = JetBrainsMonoFamily,
     fontWeight = FontWeight.SemiBold,
