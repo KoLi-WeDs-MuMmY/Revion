@@ -1,12 +1,21 @@
 package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.example.model.BatchChapter
+import com.example.model.BatchSubject
+import com.example.model.BatchesUiState
 import com.example.model.DailyRevisionBrief
 import com.example.model.FocusMode
 import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
+import com.example.model.MaterialType
+import com.example.model.Phase12MockData
+import com.example.model.PresetSubjectTemplate
 import com.example.model.SpacedReviewItem
+import com.example.model.StudyBatch
 import com.example.model.SubjectMastery
+import com.example.model.VaultMaterial
+import com.example.model.VaultUiState
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.ui.theme.AccentMood
@@ -19,6 +28,8 @@ class WorkspaceViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(createInitialMockState())
     val uiState: StateFlow<WorkspaceUiState> = _uiState.asStateFlow()
+
+    // --- Phase 1.1 Workspace & Home Actions ---
 
     fun selectTab(tab: WorkspaceTab) {
         _uiState.update { state ->
@@ -64,10 +75,339 @@ class WorkspaceViewModel : ViewModel() {
         }
     }
 
+    // --- Phase 1.2 Batches & Subject Maker Actions ---
+
+    fun selectBatch(batchId: String) {
+        _uiState.update { state ->
+            val targetBatch = state.batchesState.batches.firstOrNull { it.id == batchId }
+            val firstSubjectId = targetBatch?.subjects?.firstOrNull()?.id
+            state.copy(
+                batchesState = state.batchesState.copy(
+                    selectedBatchId = batchId,
+                    expandedSubjectId = firstSubjectId,
+                ),
+            )
+        }
+    }
+
+    fun toggleExpandSubject(subjectId: String) {
+        _uiState.update { state ->
+            val current = state.batchesState.expandedSubjectId
+            state.copy(
+                batchesState = state.batchesState.copy(
+                    expandedSubjectId = if (current == subjectId) null else subjectId,
+                ),
+            )
+        }
+    }
+
+    fun toggleChapterCompleted(batchId: String, subjectId: String, chapterId: String) {
+        _uiState.update { state ->
+            val updatedBatches = state.batchesState.batches.map { batch ->
+                if (batch.id != batchId) return@map batch
+                val updatedSubjects = batch.subjects.map { subject ->
+                    if (subject.id != subjectId) return@map subject
+                    val updatedChapters = subject.chapters.map { chapter ->
+                        if (chapter.id != chapterId) return@map chapter
+                        val nowCompleted = !chapter.isCompleted
+                        chapter.copy(
+                            isCompleted = nowCompleted,
+                            progressPercent = if (nowCompleted) 100 else 55,
+                        )
+                    }
+                    val avgMastery = if (updatedChapters.isEmpty()) {
+                        subject.masteryPercent
+                    } else {
+                        updatedChapters.sumOf { it.progressPercent } / updatedChapters.size
+                    }
+                    val doneLectures = updatedChapters
+                        .filter { it.isCompleted }
+                        .sumOf { it.lectureCount }
+                        .coerceAtMost(subject.lectureCount)
+                    subject.copy(
+                        chapters = updatedChapters,
+                        masteryPercent = avgMastery,
+                        completedLectures = doneLectures,
+                    )
+                }
+                batch.copy(subjects = updatedSubjects)
+            }
+            state.copy(
+                batchesState = state.batchesState.copy(batches = updatedBatches),
+            )
+        }
+    }
+
+    fun openCreateBatchBuilder() {
+        _uiState.update { state ->
+            state.copy(batchesState = state.batchesState.copy(isBuilderOpen = true))
+        }
+    }
+
+    fun closeCreateBatchBuilder() {
+        _uiState.update { state ->
+            state.copy(batchesState = state.batchesState.copy(isBuilderOpen = false))
+        }
+    }
+
+    fun createCustomBatch(
+        name: String,
+        goalTag: String,
+        accentMood: AccentMood,
+        selectedTemplates: List<PresetSubjectTemplate>,
+        customSubjectName: String,
+    ) {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) return
+
+        val batchId = "batch_custom_${System.currentTimeMillis()}"
+        val baseSubjects = selectedTemplates.ifEmpty {
+            listOf(Phase12MockData.presetSubjectTemplates.first())
+        }.toMutableList()
+
+        val customTrimmed = customSubjectName.trim()
+        if (customTrimmed.isNotEmpty() && baseSubjects.none { it.name.equals(customTrimmed, ignoreCase = true) }) {
+            baseSubjects.add(
+                PresetSubjectTemplate(
+                    id = "tmpl_custom_${System.currentTimeMillis()}",
+                    name = customTrimmed,
+                    accentMood = accentMood,
+                    defaultLectures = 12,
+                ),
+            )
+        }
+
+        val createdSubjects = baseSubjects.mapIndexed { idx, template ->
+            val subjectId = "${batchId}_sub_$idx"
+            BatchSubject(
+                id = subjectId,
+                name = template.name,
+                accentMood = template.accentMood,
+                lectureCount = template.defaultLectures,
+                completedLectures = 2,
+                masteryPercent = 24,
+                chapters = listOf(
+                    BatchChapter(
+                        id = "${subjectId}_ch_1",
+                        title = "${template.name} Foundations & Core Laws",
+                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
+                        progressPercent = 45,
+                        isCompleted = false,
+                        materialCount = 1,
+                    ),
+                    BatchChapter(
+                        id = "${subjectId}_ch_2",
+                        title = "${template.name} High-Yield Problem Patterns",
+                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
+                        progressPercent = 18,
+                        isCompleted = false,
+                        materialCount = 1,
+                    ),
+                    BatchChapter(
+                        id = "${subjectId}_ch_3",
+                        title = "${template.name} Synthesis & Timed Recall",
+                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
+                        progressPercent = 8,
+                        isCompleted = false,
+                        materialCount = 1,
+                    ),
+                ),
+            )
+        }
+
+        val newBatch = StudyBatch(
+            id = batchId,
+            name = trimmedName,
+            goalTag = goalTag,
+            accentMood = accentMood,
+            targetDateLabel = "Custom Track",
+            totalHoursLogged = 0,
+            subjects = createdSubjects,
+        )
+
+        // Also seed a starter mock Vault material so the new batch appears live in Vault
+        val firstSubject = createdSubjects.first()
+        val starterMaterial = VaultMaterial(
+            id = "mat_starter_${System.currentTimeMillis()}",
+            batchId = batchId,
+            batchName = trimmedName,
+            subjectId = firstSubject.id,
+            subjectName = firstSubject.name,
+            subjectMood = firstSubject.accentMood,
+            chapterTitle = firstSubject.chapters.first().title,
+            title = "$trimmedName — Starter Syllabus Roadmap",
+            type = MaterialType.PDF_NOTES,
+            pageCount = 10,
+            fileSizeLabel = "1.6 MB",
+            lastOpenedLabel = "Just created",
+            estimatedReadMinutes = 9,
+            summary = "Auto-structured starter overview for $trimmedName covering ${createdSubjects.joinToString { it.name }}.",
+            outlineSections = createdSubjects.mapIndexed { index, sub ->
+                "0${index + 1} · ${sub.name} Track Blueprint"
+            },
+        )
+
+        _uiState.update { state ->
+            state.copy(
+                batchesState = state.batchesState.copy(
+                    batches = listOf(newBatch) + state.batchesState.batches,
+                    selectedBatchId = batchId,
+                    expandedSubjectId = firstSubject.id,
+                    isBuilderOpen = false,
+                ),
+                vaultState = state.vaultState.copy(
+                    materials = listOf(starterMaterial) + state.vaultState.materials,
+                ),
+            )
+        }
+    }
+
+    // --- Phase 1.2 Study Material Vault Actions ---
+
+    fun selectVaultBatchFilter(batchId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    selectedBatchId = batchId,
+                    selectedSubjectId = null,
+                    selectedChapter = null,
+                ),
+            )
+        }
+    }
+
+    fun selectVaultSubjectFilter(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    selectedSubjectId = subjectId,
+                    selectedChapter = null,
+                ),
+            )
+        }
+    }
+
+    fun selectVaultChapterFilter(chapterTitle: String?) {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(selectedChapter = chapterTitle),
+            )
+        }
+    }
+
+    fun updateVaultSearchQuery(query: String) {
+        _uiState.update { state ->
+            state.copy(vaultState = state.vaultState.copy(searchQuery = query))
+        }
+    }
+
+    fun clearVaultFilters() {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    selectedBatchId = null,
+                    selectedSubjectId = null,
+                    selectedChapter = null,
+                    searchQuery = "",
+                ),
+            )
+        }
+    }
+
+    fun previewVaultMaterial(materialId: String) {
+        _uiState.update { state ->
+            val toggled = if (state.vaultState.previewedMaterialId == materialId) null else materialId
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    previewedMaterialId = toggled,
+                    openedReaderMaterialId = null,
+                    showReaderInfoDrawer = false,
+                ),
+            )
+        }
+    }
+
+    fun closeVaultPreview() {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(previewedMaterialId = null),
+            )
+        }
+    }
+
+    /**
+     * Opens the mock PDF reader and collapses the right-hand split preview panel cleanly.
+     */
+    fun openVaultPdfReader(materialId: String) {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    previewedMaterialId = null, // Collapse preview panel on open
+                    openedReaderMaterialId = materialId,
+                    readerCurrentPage = 1,
+                    showReaderInfoDrawer = false,
+                ),
+            )
+        }
+    }
+
+    fun closeVaultPdfReader() {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    openedReaderMaterialId = null,
+                    showReaderInfoDrawer = false,
+                ),
+            )
+        }
+    }
+
+    fun toggleReaderInfoDrawer() {
+        _uiState.update { state ->
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    showReaderInfoDrawer = !state.vaultState.showReaderInfoDrawer,
+                ),
+            )
+        }
+    }
+
+    fun stepReaderPage(delta: Int) {
+        _uiState.update { state ->
+            val maxPages = state.vaultState.openedReaderMaterial?.pageCount ?: 1
+            val nextPage = (state.vaultState.readerCurrentPage + delta).coerceIn(1, maxPages)
+            state.copy(
+                vaultState = state.vaultState.copy(readerCurrentPage = nextPage),
+            )
+        }
+    }
+
+    fun jumpReaderToPage(page: Int) {
+        _uiState.update { state ->
+            val maxPages = state.vaultState.openedReaderMaterial?.pageCount ?: 1
+            state.copy(
+                vaultState = state.vaultState.copy(
+                    readerCurrentPage = page.coerceIn(1, maxPages),
+                    showReaderInfoDrawer = false,
+                ),
+            )
+        }
+    }
+
+    // --- Layered Back Navigation ---
+
     fun navigateBackToHome() {
         _uiState.update { state ->
             when {
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
+                state.activeTab == WorkspaceTab.BATCHES && state.batchesState.isBuilderOpen ->
+                    state.copy(batchesState = state.batchesState.copy(isBuilderOpen = false))
+                state.activeTab == WorkspaceTab.VAULT && state.vaultState.showReaderInfoDrawer ->
+                    state.copy(vaultState = state.vaultState.copy(showReaderInfoDrawer = false))
+                state.activeTab == WorkspaceTab.VAULT && state.vaultState.isReaderOpen ->
+                    state.copy(vaultState = state.vaultState.copy(openedReaderMaterialId = null))
+                state.activeTab == WorkspaceTab.VAULT && state.vaultState.previewedMaterialId != null ->
+                    state.copy(vaultState = state.vaultState.copy(previewedMaterialId = null))
                 state.activeTab != WorkspaceTab.HOME -> state.copy(activeTab = WorkspaceTab.HOME)
                 else -> state
             }
@@ -277,6 +617,9 @@ class WorkspaceViewModel : ViewModel() {
             ),
         )
 
+        val initialBatches = Phase12MockData.createInitialBatches()
+        val firstBatch = initialBatches.first()
+
         return WorkspaceUiState(
             activeTab = WorkspaceTab.HOME,
             accentMood = AccentMood.CYAN,
@@ -287,6 +630,16 @@ class WorkspaceViewModel : ViewModel() {
             yesterdayTopics = yesterdayTopics,
             spacedReviews = spacedReviews,
             inspectSelection = null,
+            batchesState = BatchesUiState(
+                batches = initialBatches,
+                selectedBatchId = firstBatch.id,
+                expandedSubjectId = firstBatch.subjects.firstOrNull()?.id,
+                isBuilderOpen = false,
+            ),
+            vaultState = VaultUiState(
+                materials = Phase12MockData.createInitialVaultMaterials(),
+                previewedMaterialId = "mat_phys_gauss_pdf",
+            ),
         )
     }
 }

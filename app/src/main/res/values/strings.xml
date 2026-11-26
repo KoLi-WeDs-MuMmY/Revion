@@ -53,4 +53,36 @@
     <string name="placeholder_planned_modules">Planned Capabilities</string>
     <string name="placeholder_test_accent">Test Dynamic Accent</string>
     <string name="placeholder_status_blueprint">WORKSPACE SHELL READY</string>
+
+    <!-- Phase 1.2: Batches & Subject Maker -->
+    <string name="batches_title">Batches &amp; Subjects</string>
+    <string name="batches_subtitle">Custom exam tracks, subject color signatures &amp; chapter velocity</string>
+    <string name="batches_create_cta">Create Custom Batch</string>
+    <string name="batches_builder_title">New Custom Batch</string>
+    <string name="batches_builder_subtitle">Mix subjects, pick an accent mood, and launch a tailored track.</string>
+    <string name="batches_builder_name_label">Batch Name</string>
+    <string name="batches_builder_name_hint">e.g. NEET Dropper Intensive 2026</string>
+    <string name="batches_builder_goal_label">Target Goal Tag</string>
+    <string name="batches_builder_subjects_label">Pick &amp; Mix Subjects</string>
+    <string name="batches_builder_custom_subject_hint">Add custom subject (optional)</string>
+    <string name="batches_builder_accent_label">Batch Accent Mood</string>
+    <string name="batches_builder_submit">Create Batch</string>
+    <string name="batches_chapters_label">Chapters &amp; Syllabus</string>
+
+    <!-- Phase 1.2: Study Material Vault -->
+    <string name="vault_title">Study Material Vault</string>
+    <string name="vault_subtitle">Batch → Subject → Chapter library with live split preview</string>
+    <string name="vault_search_hint">Search PDFs, formula sheets, or chapters…</string>
+    <string name="vault_filter_all_batches">All Batches</string>
+    <string name="vault_filter_all_subjects">All Subjects</string>
+    <string name="vault_filter_all_chapters">All Chapters</string>
+    <string name="vault_open_pdf_cta">Open PDF</string>
+    <string name="vault_preview_badge">DOCUMENT INSPECTOR</string>
+    <string name="vault_outline_label">Chapter Outline</string>
+    <string name="vault_empty_title">No matching study materials</string>
+    <string name="vault_empty_subtitle">Try clearing your search or switching Batch / Subject filters.</string>
+    <string name="vault_reset_filters">Reset Filters</string>
+    <string name="vault_reader_close">Back to Vault</string>
+    <string name="vault_reader_info_toggle">Details</string>
+    <string name="vault_reader_mock_notice">Phase 1.2 visual reader deck — real PDF engine plugs in during Phase 2.</string>
 </resources>

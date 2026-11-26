@@ -26,12 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.model.InspectSelection
+import com.example.model.PresetSubjectTemplate
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
+import com.example.ui.batches.BatchesScreen
 import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.vault.VaultScreen
 
 @Composable
 fun WorkspaceShell(
@@ -43,13 +46,41 @@ fun WorkspaceShell(
     onOpenInspect: (InspectSelection) -> Unit,
     onCloseInspect: () -> Unit,
     onJumpFromInspect: (WorkspaceTab) -> Unit,
+    // Phase 1.2 Batches callbacks
+    onSelectBatch: (String) -> Unit,
+    onToggleExpandSubject: (String) -> Unit,
+    onToggleChapterCompleted: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onOpenCreateBatchBuilder: () -> Unit,
+    onCloseCreateBatchBuilder: () -> Unit,
+    onCreateCustomBatch: (
+        name: String,
+        goalTag: String,
+        accentMood: AccentMood,
+        selectedSubjects: List<PresetSubjectTemplate>,
+        customSubjectName: String,
+    ) -> Unit,
+    // Phase 1.2 Vault callbacks
+    onSelectVaultBatchFilter: (String?) -> Unit,
+    onSelectVaultSubjectFilter: (String?) -> Unit,
+    onSelectVaultChapterFilter: (String?) -> Unit,
+    onUpdateVaultSearch: (String) -> Unit,
+    onClearVaultFilters: () -> Unit,
+    onPreviewVaultMaterial: (String) -> Unit,
+    onCloseVaultPreview: () -> Unit,
+    onOpenVaultPdfReader: (String) -> Unit,
+    onCloseVaultPdfReader: () -> Unit,
+    onToggleReaderInfo: () -> Unit,
+    onStepReaderPage: (Int) -> Unit,
+    onJumpReaderToPage: (Int) -> Unit,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
 
-    // Hardware/gesture Back returns cleanly to Home from any Phase 1.2-1.5 tab
-    BackHandler(enabled = uiState.activeTab != WorkspaceTab.HOME) {
+    val canHandleBack = uiState.activeTab != WorkspaceTab.HOME ||
+        uiState.inspectSelection != null
+
+    BackHandler(enabled = canHandleBack) {
         onNavigateBackToHome()
     }
 
@@ -58,7 +89,6 @@ fun WorkspaceShell(
             .fillMaxSize()
             .background(tokens.amoledBackground),
     ) {
-        // Landscape-first responsive decision based on actual container constraints
         val isWideLayout = maxWidth >= 640.dp || maxWidth > maxHeight
 
         if (isWideLayout) {
@@ -91,6 +121,24 @@ fun WorkspaceShell(
                         onOpenInspect = onOpenInspect,
                         onCloseInspect = onCloseInspect,
                         onJumpFromInspect = onJumpFromInspect,
+                        onSelectBatch = onSelectBatch,
+                        onToggleExpandSubject = onToggleExpandSubject,
+                        onToggleChapterCompleted = onToggleChapterCompleted,
+                        onOpenCreateBatchBuilder = onOpenCreateBatchBuilder,
+                        onCloseCreateBatchBuilder = onCloseCreateBatchBuilder,
+                        onCreateCustomBatch = onCreateCustomBatch,
+                        onSelectVaultBatchFilter = onSelectVaultBatchFilter,
+                        onSelectVaultSubjectFilter = onSelectVaultSubjectFilter,
+                        onSelectVaultChapterFilter = onSelectVaultChapterFilter,
+                        onUpdateVaultSearch = onUpdateVaultSearch,
+                        onClearVaultFilters = onClearVaultFilters,
+                        onPreviewVaultMaterial = onPreviewVaultMaterial,
+                        onCloseVaultPreview = onCloseVaultPreview,
+                        onOpenVaultPdfReader = onOpenVaultPdfReader,
+                        onCloseVaultPdfReader = onCloseVaultPdfReader,
+                        onToggleReaderInfo = onToggleReaderInfo,
+                        onStepReaderPage = onStepReaderPage,
+                        onJumpReaderToPage = onJumpReaderToPage,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -118,6 +166,24 @@ fun WorkspaceShell(
                         onOpenInspect = onOpenInspect,
                         onCloseInspect = onCloseInspect,
                         onJumpFromInspect = onJumpFromInspect,
+                        onSelectBatch = onSelectBatch,
+                        onToggleExpandSubject = onToggleExpandSubject,
+                        onToggleChapterCompleted = onToggleChapterCompleted,
+                        onOpenCreateBatchBuilder = onOpenCreateBatchBuilder,
+                        onCloseCreateBatchBuilder = onCloseCreateBatchBuilder,
+                        onCreateCustomBatch = onCreateCustomBatch,
+                        onSelectVaultBatchFilter = onSelectVaultBatchFilter,
+                        onSelectVaultSubjectFilter = onSelectVaultSubjectFilter,
+                        onSelectVaultChapterFilter = onSelectVaultChapterFilter,
+                        onUpdateVaultSearch = onUpdateVaultSearch,
+                        onClearVaultFilters = onClearVaultFilters,
+                        onPreviewVaultMaterial = onPreviewVaultMaterial,
+                        onCloseVaultPreview = onCloseVaultPreview,
+                        onOpenVaultPdfReader = onOpenVaultPdfReader,
+                        onCloseVaultPdfReader = onCloseVaultPdfReader,
+                        onToggleReaderInfo = onToggleReaderInfo,
+                        onStepReaderPage = onStepReaderPage,
+                        onJumpReaderToPage = onJumpReaderToPage,
                         onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
                     )
                 }
@@ -141,6 +207,30 @@ private fun WorkspaceStage(
     onOpenInspect: (InspectSelection) -> Unit,
     onCloseInspect: () -> Unit,
     onJumpFromInspect: (WorkspaceTab) -> Unit,
+    onSelectBatch: (String) -> Unit,
+    onToggleExpandSubject: (String) -> Unit,
+    onToggleChapterCompleted: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onOpenCreateBatchBuilder: () -> Unit,
+    onCloseCreateBatchBuilder: () -> Unit,
+    onCreateCustomBatch: (
+        name: String,
+        goalTag: String,
+        accentMood: AccentMood,
+        selectedSubjects: List<PresetSubjectTemplate>,
+        customSubjectName: String,
+    ) -> Unit,
+    onSelectVaultBatchFilter: (String?) -> Unit,
+    onSelectVaultSubjectFilter: (String?) -> Unit,
+    onSelectVaultChapterFilter: (String?) -> Unit,
+    onUpdateVaultSearch: (String) -> Unit,
+    onClearVaultFilters: () -> Unit,
+    onPreviewVaultMaterial: (String) -> Unit,
+    onCloseVaultPreview: () -> Unit,
+    onOpenVaultPdfReader: (String) -> Unit,
+    onCloseVaultPdfReader: () -> Unit,
+    onToggleReaderInfo: () -> Unit,
+    onStepReaderPage: (Int) -> Unit,
+    onJumpReaderToPage: (Int) -> Unit,
     onReturnHome: () -> Unit,
 ) {
     val spatialSpring = spring<IntOffset>(
@@ -174,6 +264,37 @@ private fun WorkspaceStage(
                 onOpenInspect = onOpenInspect,
                 onCloseInspect = onCloseInspect,
                 onJumpFromInspect = onJumpFromInspect,
+            )
+
+            WorkspaceTab.BATCHES -> BatchesScreen(
+                batchesState = uiState.batchesState,
+                activeThemeMood = uiState.accentMood,
+                isWideLayout = isWideLayout,
+                onSelectBatch = onSelectBatch,
+                onToggleExpandSubject = onToggleExpandSubject,
+                onToggleChapterCompleted = onToggleChapterCompleted,
+                onOpenBuilder = onOpenCreateBatchBuilder,
+                onCloseBuilder = onCloseCreateBatchBuilder,
+                onCreateBatch = onCreateCustomBatch,
+            )
+
+            WorkspaceTab.VAULT -> VaultScreen(
+                vaultState = uiState.vaultState,
+                batches = uiState.batchesState.batches,
+                activeThemeMood = uiState.accentMood,
+                isWideLayout = isWideLayout,
+                onSelectBatchFilter = onSelectVaultBatchFilter,
+                onSelectSubjectFilter = onSelectVaultSubjectFilter,
+                onSelectChapterFilter = onSelectVaultChapterFilter,
+                onSearchQueryChange = onUpdateVaultSearch,
+                onClearFilters = onClearVaultFilters,
+                onPreviewMaterial = onPreviewVaultMaterial,
+                onClosePreview = onCloseVaultPreview,
+                onOpenPdfReader = onOpenVaultPdfReader,
+                onClosePdfReader = onCloseVaultPdfReader,
+                onToggleReaderInfo = onToggleReaderInfo,
+                onStepReaderPage = onStepReaderPage,
+                onJumpReaderToPage = onJumpReaderToPage,
             )
 
             else -> PhasePlaceholderScreen(

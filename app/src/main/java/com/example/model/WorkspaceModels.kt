@@ -197,4 +197,6 @@ data class WorkspaceUiState(
     val yesterdayTopics: List<LoggedTopic>,
     val spacedReviews: List<SpacedReviewItem>,
     val inspectSelection: InspectSelection? = null,
+    val batchesState: BatchesUiState,
+    val vaultState: VaultUiState,
 )
