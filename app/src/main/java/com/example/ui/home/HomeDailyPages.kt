@@ -89,6 +89,7 @@ fun TodayRevisionPage(
     state: HomeCommandState,
     appTheme: AppThemeId,
     isWideLayout: Boolean,
+    autoTimerBadgeText: String? = null,
     onBackToHome: () -> Unit,
     onMarkComplete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -118,6 +119,7 @@ fun TodayRevisionPage(
             DailyPageTopBar(
                 title = stringResource(R.string.home_today_revision_title),
                 subtitle = state.todayRevisionGeneratedLabel,
+                autoTimerBadgeText = autoTimerBadgeText,
                 onBackToHome = onBackToHome,
                 backButtonTag = "today_revision_back_button",
             )
@@ -214,6 +216,7 @@ fun TodayFlashcardsPage(
     state: HomeCommandState,
     appTheme: AppThemeId,
     isWideLayout: Boolean,
+    autoTimerBadgeText: String? = null,
     onBackToHome: () -> Unit,
     onFlipCard: () -> Unit,
     onStepCard: (Int) -> Unit,
@@ -249,6 +252,7 @@ fun TodayFlashcardsPage(
             DailyPageTopBar(
                 title = stringResource(R.string.home_today_flashcards_title),
                 subtitle = state.todayRevisionGeneratedLabel,
+                autoTimerBadgeText = autoTimerBadgeText,
                 onBackToHome = onBackToHome,
                 backButtonTag = "today_flashcards_back_button",
             )
@@ -460,6 +464,7 @@ fun TodayFlashcardsPage(
 private fun DailyPageTopBar(
     title: String,
     subtitle: String,
+    autoTimerBadgeText: String? = null,
     onBackToHome: () -> Unit,
     backButtonTag: String,
 ) {
@@ -470,7 +475,7 @@ private fun DailyPageTopBar(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -524,28 +529,57 @@ private fun DailyPageTopBar(
             )
         }
 
-        // Low-key "Auto-Saved to Vault" status pill
-        Surface(
-            shape = RoundedCornerShape(100.dp),
-            color = tokens.carbonSurface,
-            border = BorderStroke(1.dp, emerald.copy(alpha = 0.28f)),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Live Automatic Count-Up Timer Badge (starts at 00:00 on open, logs automatically on exit)
+        if (autoTimerBadgeText != null) {
+            Surface(
+                shape = RoundedCornerShape(100.dp),
+                color = tokens.themeAccent.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, tokens.themeAccent.copy(alpha = 0.55f)),
+                modifier = Modifier.testTag("daily_page_auto_timer_pill"),
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.CloudDone,
-                    contentDescription = null,
-                    tint = emerald,
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = stringResource(R.string.home_auto_saved_vault),
-                    style = MicroTagMono,
-                    color = tokens.inkSecondary,
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(emerald),
+                    )
+                    Text(
+                        text = autoTimerBadgeText,
+                        style = MicroTagMono,
+                        color = tokens.inkPrimary,
+                        maxLines = 1,
+                    )
+                }
+            }
+        } else {
+            // Low-key "Auto-Saved to Vault" status pill
+            Surface(
+                shape = RoundedCornerShape(100.dp),
+                color = tokens.carbonSurface,
+                border = BorderStroke(1.dp, emerald.copy(alpha = 0.28f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CloudDone,
+                        contentDescription = null,
+                        tint = emerald,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.home_auto_saved_vault),
+                        style = MicroTagMono,
+                        color = tokens.inkSecondary,
+                    )
+                }
             }
         }
     }

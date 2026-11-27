@@ -327,4 +327,10 @@
     <string name="quizzes_palette_desc">Open question palette</string>
     <string name="quizzes_submit_final">Submit Test</string>
     <string name="quizzes_ask_tutor_weak">Study in AI Tutor</string>
+
+    <!-- Phase 1.6.3: Standalone Daily Planner, Synced Study Timer & YPT Group Study -->
+    <string name="home_quick_launch_timer">Study Timer</string>
+    <string name="planner_standalone_title">Daily Planner</string>
+    <string name="planner_standalone_subtitle">Zero-context AI planning powered by RAG(1) multi-horizon telemetry &amp; RAG(2) live profile</string>
+    <string name="timer_vault_lock_banner_return">Return to Timer</string>
 </resources>

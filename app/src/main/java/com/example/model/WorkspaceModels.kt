@@ -237,6 +237,9 @@ data class WorkspaceUiState(
     val tutorPlannerState: TutorPlannerUiState,
     val grokTutorState: GrokTutorUiState,
     val pwQuizArenaState: PwQuizArenaUiState,
+    val standalonePlannerState: StandalonePlannerUiState,
+    val studyTimerGroupState: StudyTimerGroupUiState,
+    val settingsRagHubState: SettingsRagHubState = SettingsRagHubState(),
 ) {
     val primaryBatch: StudyBatch
         get() = batchesState.batches.firstOrNull { it.id == primaryBatchId }

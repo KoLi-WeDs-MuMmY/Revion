@@ -8,8 +8,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.navigation.Phase163Actions
 import com.example.ui.navigation.WorkspaceShell
 import com.example.ui.theme.GhickinTheme
 import com.example.viewmodel.WorkspaceViewModel
@@ -37,6 +39,58 @@ class MainActivity : ComponentActivity() {
                         navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
                     )
                 }
+            }
+
+            val phase163Actions = remember(workspaceViewModel) {
+                Phase163Actions(
+                    onToggleStandaloneAiPlanner = workspaceViewModel::toggleStandaloneAiPlanner,
+                    onReopenPlannerZeroContextWindow = workspaceViewModel::reopenPlannerZeroContextWindow,
+                    onSimulateFirstTimePlannerIngestion = workspaceViewModel::simulateFirstTimePlannerIngestion,
+                    onRefreshPlannerRag2 = workspaceViewModel::refreshPlannerRag2,
+                    onRequestConfirmDailySchedule = workspaceViewModel::requestConfirmDailySchedule,
+                    onToggleStandaloneTaskCompleted = workspaceViewModel::toggleStandaloneTaskCompleted,
+                    onRequestAddStandaloneTask = workspaceViewModel::requestAddStandaloneTask,
+                    onRequestEditStandaloneTask = workspaceViewModel::requestEditStandaloneTask,
+                    onRequestCancelStandaloneTask = workspaceViewModel::requestCancelStandaloneTask,
+                    onUpdatePlannerGateTitle = workspaceViewModel::updatePlannerGateTitle,
+                    onUpdatePlannerGateTimeWindow = workspaceViewModel::updatePlannerGateTimeWindow,
+                    onUpdatePlannerGateReason = workspaceViewModel::updatePlannerGateReason,
+                    onSimulatePlannerGateOutcome = workspaceViewModel::simulatePlannerGateOutcome,
+                    onApplyPlannerGateApproved = workspaceViewModel::applyPlannerGateApproved,
+                    onAcceptPlannerGateCounterProposal = workspaceViewModel::acceptPlannerGateCounterProposal,
+                    onDismissPlannerGate = workspaceViewModel::dismissPlannerGate,
+                    onDismissPlannerNotice = workspaceViewModel::dismissPlannerNotice,
+                    onSelectTimerMode = workspaceViewModel::selectTimerMode,
+                    onSelectPomodoroStyle = workspaceViewModel::selectPomodoroStyle,
+                    onApplyPomodoroPreset = workspaceViewModel::applyPomodoroPreset,
+                    onSwitchPomodoroPhase = workspaceViewModel::switchPomodoroPhase,
+                    onAddFiveMinutesToTimer = workspaceViewModel::addFiveMinutesToTimer,
+                    onRequestStartFromMainTimerButton = workspaceViewModel::requestStartFromMainTimerButton,
+                    onQuickStartSubjectTimer = workspaceViewModel::quickStartSubjectTimer,
+                    onConfirmStartTimerWithTag = workspaceViewModel::confirmStartTimerWithTag,
+                    onSkipStartTimerTagless = workspaceViewModel::skipStartTimerTagless,
+                    onDismissStartTagDialog = workspaceViewModel::dismissStartTagDialog,
+                    onPauseOrResumeStudyTimer = workspaceViewModel::pauseOrResumeStudyTimer,
+                    onResetStudyTimer = workspaceViewModel::resetStudyTimer,
+                    onStopAndLogStudyTimer = workspaceViewModel::stopAndLogStudyTimer,
+                    onSetTimerSplitRatio = workspaceViewModel::setTimerSplitRatio,
+                    onToggleGroupStudySplit = workspaceViewModel::toggleGroupStudySplit,
+                    onOpenTimerStatsSheet = workspaceViewModel::openTimerStatsSheet,
+                    onCloseTimerStatsSheet = workspaceViewModel::closeTimerStatsSheet,
+                    onJoinYptGroup = workspaceViewModel::joinYptGroup,
+                    onOpenCreateYptGroupDialog = workspaceViewModel::openCreateYptGroupDialog,
+                    onCloseCreateYptGroupDialog = workspaceViewModel::closeCreateYptGroupDialog,
+                    onCreatePublicYptGroup = workspaceViewModel::createPublicYptGroup,
+                    onSelectYptUserStatus = workspaceViewModel::selectYptUserStatus,
+                    onDismissSingleTimerLockNotice = workspaceViewModel::dismissSingleTimerLockNotice,
+                    onOpenVaultWhileTimerActive = workspaceViewModel::openVaultWhileTimerActive,
+                    onReturnToActiveTimerFromVault = workspaceViewModel::returnToActiveTimerFromVault,
+                    onSelectSettingsSection = workspaceViewModel::selectSettingsSection,
+                    onOpenSettingsAtRagFile = workspaceViewModel::openSettingsAtRagFile,
+                    onSelectSettingsRagFile = workspaceViewModel::selectSettingsRagFile,
+                    onUpdateSettingsRagUserNote = workspaceViewModel::updateSettingsRagUserNote,
+                    onRunSettingsRagAiOptimization = workspaceViewModel::runSettingsRagAiOptimization,
+                )
             }
 
             GhickinTheme(
@@ -132,6 +186,7 @@ class MainActivity : ComponentActivity() {
                     onRetryMissedQuizQuestions = workspaceViewModel::retryMissedQuizQuestions,
                     onRetakeFullQuiz = workspaceViewModel::retakeFullQuizArena,
                     onStudyWeakChapterInTutor = workspaceViewModel::jumpFromWeakTopicToTutor,
+                    phase163Actions = phase163Actions,
                     onNavigateBackToHome = workspaceViewModel::navigateBackToHome,
                 )
             }

@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Quiz
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,7 +75,10 @@ import com.example.model.DailyPageRoute
 import com.example.model.HomeCommandState
 import com.example.model.HomeLiveAnalytics
 import com.example.model.StudyBatch
+import com.example.model.TimerSessionSource
 import com.example.model.WorkspaceUiState
+import com.example.model.formatDurationCompactHm
+import com.example.model.formatDurationHms
 import com.example.ui.components.AnimatedLinearProgressBar
 import com.example.ui.components.AnimatedMasteryRing
 import com.example.ui.components.KineticNumberText
@@ -108,9 +112,19 @@ fun HomeCommandCenter(
     onStartTodaysNewStudy: () -> Unit,
     onQuickOpenAiTutor: () -> Unit = {},
     onQuickOpenQuizzes: () -> Unit = {},
+    onQuickOpenStudyTimer: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeState = uiState.homeCommandState
+    val timerState = uiState.studyTimerGroupState
+
+    val autoRevisionBadge = if (timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_REVISION) {
+        "AUTO · Revision · ${formatDurationHms(timerState.elapsedSeconds)}"
+    } else null
+
+    val autoFlashcardsBadge = if (timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_FLASHCARDS) {
+        "AUTO · Flashcards · ${formatDurationHms(timerState.elapsedSeconds)}"
+    } else null
 
     AnimatedContent(
         targetState = homeState.activeDailyPage,
@@ -126,6 +140,7 @@ fun HomeCommandCenter(
                 state = homeState,
                 appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
+                autoTimerBadgeText = autoRevisionBadge,
                 onBackToHome = onCloseDailyPage,
                 onMarkComplete = onCompleteTodayRevision,
             )
@@ -134,6 +149,7 @@ fun HomeCommandCenter(
                 state = homeState,
                 appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
+                autoTimerBadgeText = autoFlashcardsBadge,
                 onBackToHome = onCloseDailyPage,
                 onFlipCard = onFlipDailyFlashcard,
                 onStepCard = onStepDailyFlashcard,
@@ -153,6 +169,7 @@ fun HomeCommandCenter(
                 onStartTodaysNewStudy = onStartTodaysNewStudy,
                 onQuickOpenAiTutor = onQuickOpenAiTutor,
                 onQuickOpenQuizzes = onQuickOpenQuizzes,
+                onQuickOpenStudyTimer = onQuickOpenStudyTimer,
             )
         }
     }
@@ -172,6 +189,7 @@ private fun HomeCommandCanvas(
     onStartTodaysNewStudy: () -> Unit,
     onQuickOpenAiTutor: () -> Unit,
     onQuickOpenQuizzes: () -> Unit,
+    onQuickOpenStudyTimer: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val primaryBatch = uiState.primaryBatch
@@ -303,33 +321,95 @@ private fun HomeCommandCanvas(
                 }
             }
 
-            // Section 1.5: Studio Quick-Launch Strip (AI Tutor & Quiz Arena)
+            // Section 1.5: Studio Quick-Launch Strip (Study Timer, AI Tutor & Quiz Arena)
             item(key = "home_studio_quick_launch") {
+                val timerState = uiState.studyTimerGroupState
+                val timerBadge = if (timerState.isTimerActiveSession) {
+                    "LIVE ${formatDurationHms(timerState.displaySeconds)}"
+                } else {
+                    "${formatDurationCompactHm(timerState.todayTotalStudySeconds)} TODAY"
+                }
+                val timerSubtitle = if (timerState.isTimerActiveSession) {
+                    "Synced with YPT Group · ${timerState.activeSubjectName ?: "Tagless"}"
+                } else {
+                    "Pomodoro, Flip Stopwatch & YPT Group Study"
+                }
+
                 StaggeredEntrance(delayMillis = 75L) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(if (isWideLayout) 16.dp else 10.dp),
-                    ) {
-                        StudioQuickLaunchTile(
-                            title = stringResource(R.string.home_quick_launch_tutor),
-                            subtitle = "Chapter RAG & Interactive Diagrams",
-                            badge = "${uiState.grokTutorState.diagramCatalog.size} DIAGRAMS",
-                            icon = Icons.Rounded.AutoAwesome,
-                            accent = tokens.themeAccent,
-                            testTag = "home_quick_launch_tutor",
-                            onClick = onQuickOpenAiTutor,
-                            modifier = Modifier.weight(1f),
-                        )
-                        StudioQuickLaunchTile(
-                            title = stringResource(R.string.home_quick_launch_quizzes),
-                            subtitle = "Exam Mode (+4/−1) & Weak Topics",
-                            badge = "${uiState.pwQuizArenaState.recentAttempts.size} RECENT",
-                            icon = Icons.Rounded.Quiz,
-                            accent = AccentMood.AMBER.accent,
-                            testTag = "home_quick_launch_quizzes",
-                            onClick = onQuickOpenQuizzes,
-                            modifier = Modifier.weight(1f),
-                        )
+                    if (isWideLayout) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            StudioQuickLaunchTile(
+                                title = stringResource(R.string.home_quick_launch_timer),
+                                subtitle = timerSubtitle,
+                                badge = timerBadge,
+                                icon = Icons.Rounded.Timer,
+                                accent = tokens.semanticSuccess,
+                                testTag = "home_quick_launch_timer",
+                                onClick = onQuickOpenStudyTimer,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StudioQuickLaunchTile(
+                                title = stringResource(R.string.home_quick_launch_tutor),
+                                subtitle = "Chapter RAG & Interactive Diagrams",
+                                badge = "${uiState.grokTutorState.diagramCatalog.size} DIAGRAMS",
+                                icon = Icons.Rounded.AutoAwesome,
+                                accent = tokens.themeAccent,
+                                testTag = "home_quick_launch_tutor",
+                                onClick = onQuickOpenAiTutor,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StudioQuickLaunchTile(
+                                title = stringResource(R.string.home_quick_launch_quizzes),
+                                subtitle = "Exam Mode (+4/−1) & Weak Topics",
+                                badge = "${uiState.pwQuizArenaState.recentAttempts.size} RECENT",
+                                icon = Icons.Rounded.Quiz,
+                                accent = AccentMood.AMBER.accent,
+                                testTag = "home_quick_launch_quizzes",
+                                onClick = onQuickOpenQuizzes,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StudioQuickLaunchTile(
+                                title = stringResource(R.string.home_quick_launch_timer),
+                                subtitle = timerSubtitle,
+                                badge = timerBadge,
+                                icon = Icons.Rounded.Timer,
+                                accent = tokens.semanticSuccess,
+                                testTag = "home_quick_launch_timer",
+                                onClick = onQuickOpenStudyTimer,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                StudioQuickLaunchTile(
+                                    title = stringResource(R.string.home_quick_launch_tutor),
+                                    subtitle = "Chapter RAG & Diagrams",
+                                    badge = "${uiState.grokTutorState.diagramCatalog.size}",
+                                    icon = Icons.Rounded.AutoAwesome,
+                                    accent = tokens.themeAccent,
+                                    testTag = "home_quick_launch_tutor",
+                                    onClick = onQuickOpenAiTutor,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                StudioQuickLaunchTile(
+                                    title = stringResource(R.string.home_quick_launch_quizzes),
+                                    subtitle = "Exam Mode (+4/−1)",
+                                    badge = "${uiState.pwQuizArenaState.recentAttempts.size}",
+                                    icon = Icons.Rounded.Quiz,
+                                    accent = AccentMood.AMBER.accent,
+                                    testTag = "home_quick_launch_quizzes",
+                                    onClick = onQuickOpenQuizzes,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
                     }
                 }
             }

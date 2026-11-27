@@ -30,6 +30,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +53,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.model.AppRagFileId
 import com.example.model.FocusMode
+import com.example.model.SettingsRagHubState
+import com.example.model.SettingsSectionTab
+import com.example.model.WorkspaceUiState
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
@@ -66,13 +71,19 @@ import com.example.ui.theme.rememberScreenLayoutMetrics
 
 @Composable
 fun SettingsScreen(
+    uiState: WorkspaceUiState,
     activeTheme: AppThemeId,
     activeMood: AccentMood,
     focusMode: FocusMode,
+    ragHubState: SettingsRagHubState,
     isWideLayout: Boolean,
+    onSelectSection: (SettingsSectionTab) -> Unit,
     onSelectTheme: (AppThemeId) -> Unit,
     onSelectAccentMood: (AccentMood) -> Unit,
     onToggleFocusMode: () -> Unit,
+    onSelectRagFile: (AppRagFileId) -> Unit,
+    onUpdateRagUserNote: (String) -> Unit,
+    onRunRagAiOptimization: (AppRagFileId) -> Unit,
     onCloseSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -106,104 +117,173 @@ fun SettingsScreen(
                 }
             }
 
-            item(key = "settings_themes_section") {
-                StaggeredEntrance(delayMillis = 45L) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            // Clean 2-Section Structure: Themes & Display | RAG Files & AI Optimizer
+            item(key = "settings_section_tabs") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SettingsSectionTab.entries.forEach { tab ->
+                        val selected = ragHubState.selectedSection == tab
+                        val tabInt = remember { MutableInteractionSource() }
+                        val icon = if (tab == SettingsSectionTab.THEMES_DISPLAY) {
+                            Icons.Rounded.Palette
+                        } else {
+                            Icons.Rounded.Storage
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (selected) tokens.primaryCta else tokens.obsidianSurface,
+                            border = if (!selected) BorderStroke(1.dp, tokens.hairlineRest) else null,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("settings_section_${tab.name.lowercase()}")
+                                .minimumInteractiveComponentSize()
+                                .tactileScale(tabInt, 0.97f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(
+                                    interactionSource = tabInt,
+                                    indication = ripple(),
+                                    role = Role.Tab,
+                                    onClick = { onSelectSection(tab) },
+                                ),
+                        ) {
                             Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.Center,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Palette,
+                                    imageVector = icon,
                                     contentDescription = null,
-                                    tint = tokens.themeAccent,
-                                    modifier = Modifier.size(19.dp),
+                                    tint = if (selected) tokens.onPrimaryCta else tokens.inkSecondary,
+                                    modifier = Modifier.size(18.dp),
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.settings_themes_section_title),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = tokens.inkPrimary,
+                                    text = tab.label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (selected) tokens.onPrimaryCta else tokens.inkSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                            }
-                            Text(
-                                text = stringResource(R.string.settings_themes_section_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = tokens.inkSecondary,
-                            )
-                        }
-
-                        val themes = AppThemeId.entries
-                        if (isWideLayout) {
-                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                themes.chunked(2).forEach { pair ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                    ) {
-                                        pair.forEach { theme ->
-                                            ThemePreviewCard(
-                                                theme = theme,
-                                                selected = theme == activeTheme,
-                                                onClick = { onSelectTheme(theme) },
-                                                modifier = Modifier.weight(1f),
-                                            )
-                                        }
-                                        if (pair.size == 1) {
-                                            Spacer(modifier = Modifier.weight(1f))
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                themes.forEach { theme ->
-                                    ThemePreviewCard(
-                                        theme = theme,
-                                        selected = theme == activeTheme,
-                                        onClick = { onSelectTheme(theme) },
-                                    )
-                                }
                             }
                         }
                     }
                 }
             }
 
-            item(key = "settings_accents_and_posture") {
-                StaggeredEntrance(delayMillis = 95L) {
-                    if (isWideLayout) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            SubjectIndicatorAccentCard(
-                                activeMood = activeMood,
-                                onSelectMood = onSelectAccentMood,
-                                modifier = Modifier.weight(1f),
-                            )
-                            DisplayPostureAndFocusCard(
-                                activeTheme = activeTheme,
-                                focusMode = focusMode,
-                                isWideLayout = isWideLayout,
-                                onToggleFocusMode = onToggleFocusMode,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    } else {
+            if (ragHubState.selectedSection == SettingsSectionTab.THEMES_DISPLAY) {
+                item(key = "settings_themes_section") {
+                    StaggeredEntrance(delayMillis = 45L) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SubjectIndicatorAccentCard(
-                                activeMood = activeMood,
-                                onSelectMood = onSelectAccentMood,
-                            )
-                            DisplayPostureAndFocusCard(
-                                activeTheme = activeTheme,
-                                focusMode = focusMode,
-                                isWideLayout = isWideLayout,
-                                onToggleFocusMode = onToggleFocusMode,
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Palette,
+                                        contentDescription = null,
+                                        tint = tokens.themeAccent,
+                                        modifier = Modifier.size(19.dp),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.settings_themes_section_title),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = tokens.inkPrimary,
+                                    )
+                                }
+                                Text(
+                                    text = stringResource(R.string.settings_themes_section_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tokens.inkSecondary,
+                                )
+                            }
+
+                            val themes = AppThemeId.entries
+                            if (isWideLayout) {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    themes.chunked(2).forEach { pair ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                        ) {
+                                            pair.forEach { theme ->
+                                                ThemePreviewCard(
+                                                    theme = theme,
+                                                    selected = theme == activeTheme,
+                                                    onClick = { onSelectTheme(theme) },
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                            }
+                                            if (pair.size == 1) {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    themes.forEach { theme ->
+                                        ThemePreviewCard(
+                                            theme = theme,
+                                            selected = theme == activeTheme,
+                                            onClick = { onSelectTheme(theme) },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
+                }
+
+                item(key = "settings_accents_and_posture") {
+                    StaggeredEntrance(delayMillis = 95L) {
+                        if (isWideLayout) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                SubjectIndicatorAccentCard(
+                                    activeMood = activeMood,
+                                    onSelectMood = onSelectAccentMood,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                DisplayPostureAndFocusCard(
+                                    activeTheme = activeTheme,
+                                    focusMode = focusMode,
+                                    isWideLayout = isWideLayout,
+                                    onToggleFocusMode = onToggleFocusMode,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                SubjectIndicatorAccentCard(
+                                    activeMood = activeMood,
+                                    onSelectMood = onSelectAccentMood,
+                                )
+                                DisplayPostureAndFocusCard(
+                                    activeTheme = activeTheme,
+                                    focusMode = focusMode,
+                                    isWideLayout = isWideLayout,
+                                    onToggleFocusMode = onToggleFocusMode,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                item(key = "settings_rag_hub_content") {
+                    SettingsRagHubSection(
+                        uiState = uiState,
+                        ragHubState = ragHubState,
+                        isWideLayout = isWideLayout,
+                        onSelectRagFile = onSelectRagFile,
+                        onUpdateUserNote = onUpdateRagUserNote,
+                        onRunAiOptimization = onRunRagAiOptimization,
+                    )
                 }
             }
         }

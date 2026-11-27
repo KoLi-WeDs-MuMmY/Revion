@@ -9,44 +9,148 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import com.example.model.AppRagFileId
 import com.example.model.BatchCrudDialog
 import com.example.model.ChapterDiagramRef
 import com.example.model.DailyPageRoute
 import com.example.model.DiagramAttachment
+import com.example.model.PlannerAiDecisionOutcome
+import com.example.model.PomodoroRingStyle
 import com.example.model.PresetSubjectTemplate
+import com.example.model.SettingsSectionTab
+import com.example.model.StandalonePlannerTask
+import com.example.model.StudyTimerGroupUiState
+import com.example.model.StudyTimerMode
 import com.example.model.TestArenaMode
+import com.example.model.TimerSplitRatio
 import com.example.model.VaultCategorySubView
 import com.example.model.VaultLectureNode
 import com.example.model.VaultPaletteFocus
+import com.example.model.VaultSubjectNode
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
+import com.example.model.YptMemberStatus
+import com.example.model.formatDurationHms
 import com.example.ui.batches.BatchesScreen
 import com.example.ui.components.AmbientMineralBackdrop
 import com.example.ui.home.HomeCommandCenter
-import com.example.ui.placeholders.PhasePlaceholderScreen
+import com.example.ui.planner.StandaloneDailyPlannerScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.test.PwTestArenaScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.theme.MicroTagMono
+import com.example.ui.timer.StudyTimerAndGroupScreen
 import com.example.ui.tutor.GrokAiTutorScreen
 import com.example.ui.vault.PwVaultScreen
+
+@Immutable
+data class Phase163Actions(
+    // Standalone Daily Planner
+    val onToggleStandaloneAiPlanner: (Boolean) -> Unit,
+    val onReopenPlannerZeroContextWindow: () -> Unit,
+    val onSimulateFirstTimePlannerIngestion: () -> Unit,
+    val onRefreshPlannerRag2: () -> Unit,
+    val onRequestConfirmDailySchedule: () -> Unit,
+    val onToggleStandaloneTaskCompleted: (String) -> Unit,
+    val onRequestAddStandaloneTask: () -> Unit,
+    val onRequestEditStandaloneTask: (StandalonePlannerTask) -> Unit,
+    val onRequestCancelStandaloneTask: (StandalonePlannerTask) -> Unit,
+    val onUpdatePlannerGateTitle: (String) -> Unit,
+    val onUpdatePlannerGateTimeWindow: (String) -> Unit,
+    val onUpdatePlannerGateReason: (String) -> Unit,
+    val onSimulatePlannerGateOutcome: (PlannerAiDecisionOutcome) -> Unit,
+    val onApplyPlannerGateApproved: () -> Unit,
+    val onAcceptPlannerGateCounterProposal: () -> Unit,
+    val onDismissPlannerGate: () -> Unit,
+    val onDismissPlannerNotice: () -> Unit,
+    // Synced Study Timer & YPT Group Study
+    val onSelectTimerMode: (StudyTimerMode) -> Unit,
+    val onSelectPomodoroStyle: (PomodoroRingStyle) -> Unit,
+    val onApplyPomodoroPreset: (focusMinutes: Int, breakMinutes: Int) -> Unit,
+    val onSwitchPomodoroPhase: () -> Unit,
+    val onAddFiveMinutesToTimer: () -> Unit,
+    val onRequestStartFromMainTimerButton: () -> Unit,
+    val onQuickStartSubjectTimer: (VaultSubjectNode) -> Unit,
+    val onConfirmStartTimerWithTag: (
+        subjectId: String?,
+        subjectName: String?,
+        subjectMood: AccentMood,
+        lectureId: String?,
+        lectureTitle: String?,
+    ) -> Unit,
+    val onSkipStartTimerTagless: () -> Unit,
+    val onDismissStartTagDialog: () -> Unit,
+    val onPauseOrResumeStudyTimer: () -> Unit,
+    val onResetStudyTimer: () -> Unit,
+    val onStopAndLogStudyTimer: () -> Unit,
+    val onSetTimerSplitRatio: (TimerSplitRatio) -> Unit,
+    val onToggleGroupStudySplit: () -> Unit,
+    val onOpenTimerStatsSheet: () -> Unit,
+    val onCloseTimerStatsSheet: () -> Unit,
+    val onJoinYptGroup: (String) -> Unit,
+    val onOpenCreateYptGroupDialog: () -> Unit,
+    val onCloseCreateYptGroupDialog: () -> Unit,
+    val onCreatePublicYptGroup: (name: String, category: String, targetHours: Int) -> Unit,
+    val onSelectYptUserStatus: (YptMemberStatus) -> Unit,
+    val onDismissSingleTimerLockNotice: () -> Unit,
+    val onOpenVaultWhileTimerActive: () -> Unit,
+    val onReturnToActiveTimerFromVault: () -> Unit,
+    // Restructured Settings & Centralized RAG Hub
+    val onSelectSettingsSection: (SettingsSectionTab) -> Unit,
+    val onOpenSettingsAtRagFile: (AppRagFileId) -> Unit,
+    val onSelectSettingsRagFile: (AppRagFileId) -> Unit,
+    val onUpdateSettingsRagUserNote: (String) -> Unit,
+    val onRunSettingsRagAiOptimization: (AppRagFileId) -> Unit,
+)
 
 @Composable
 fun WorkspaceShell(
@@ -149,6 +253,7 @@ fun WorkspaceShell(
     onRetryMissedQuizQuestions: () -> Unit,
     onRetakeFullQuiz: () -> Unit,
     onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
+    phase163Actions: Phase163Actions,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +267,13 @@ fun WorkspaceShell(
     BackHandler(enabled = canHandleBack) {
         onNavigateBackToHome()
     }
+
+    // Full-screen collapse when inside Study Timer & Group tab or while a manual timer lockout is active
+    val hideChrome = (uiState.activeTab == WorkspaceTab.TIMER_GROUP && !uiState.isSettingsOpen) ||
+        uiState.studyTimerGroupState.isManualTimerLocked
+    val showVaultLockBanner = uiState.studyTimerGroupState.isManualTimerLocked &&
+        uiState.activeTab == WorkspaceTab.VAULT &&
+        !uiState.isSettingsOpen
 
     BoxWithConstraints(
         modifier = modifier
@@ -184,14 +296,16 @@ fun WorkspaceShell(
                     .fillMaxSize()
                     .background(Color.Transparent),
             ) {
-                GhickinNavRail(
-                    activeTab = uiState.activeTab,
-                    isSettingsOpen = uiState.isSettingsOpen,
-                    onSelectTab = onSelectTab,
-                    onOpenSettings = onOpenSettings,
-                )
+                if (!hideChrome) {
+                    GhickinNavRail(
+                        activeTab = uiState.activeTab,
+                        isSettingsOpen = uiState.isSettingsOpen,
+                        onSelectTab = onSelectTab,
+                        onOpenSettings = onOpenSettings,
+                    )
+                }
 
-                Box(
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
@@ -201,6 +315,17 @@ fun WorkspaceShell(
                                 .union(WindowInsets.displayCutout),
                         ),
                 ) {
+                    if (showVaultLockBanner) {
+                        ActiveTimerVaultLockBanner(
+                            timerState = uiState.studyTimerGroupState,
+                            onReturnToTimer = phase163Actions.onReturnToActiveTimerFromVault,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    ) {
                     WorkspaceStage(
                         uiState = uiState,
                         isWideLayout = true,
@@ -291,23 +416,41 @@ fun WorkspaceShell(
                         onRetryMissedQuizQuestions = onRetryMissedQuizQuestions,
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
+                        phase163Actions = phase163Actions,
                     )
+                    }
                 }
             }
         } else {
+            val portraitStageInsets = if (hideChrome) {
+                WindowInsets.statusBars
+                    .union(WindowInsets.navigationBars)
+                    .union(WindowInsets.displayCutout)
+            } else {
+                WindowInsets.statusBars.union(WindowInsets.displayCutout)
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Transparent),
             ) {
-                Box(
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
-                        .windowInsetsPadding(
-                            WindowInsets.statusBars.union(WindowInsets.displayCutout),
-                        ),
+                        .windowInsetsPadding(portraitStageInsets),
                 ) {
+                    if (showVaultLockBanner) {
+                        ActiveTimerVaultLockBanner(
+                            timerState = uiState.studyTimerGroupState,
+                            onReturnToTimer = phase163Actions.onReturnToActiveTimerFromVault,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    ) {
                     WorkspaceStage(
                         uiState = uiState,
                         isWideLayout = false,
@@ -398,14 +541,140 @@ fun WorkspaceShell(
                         onRetryMissedQuizQuestions = onRetryMissedQuizQuestions,
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
+                        phase163Actions = phase163Actions,
                     )
+                    }
                 }
 
-                GhickinBottomNavBar(
-                    activeTab = uiState.activeTab,
-                    isSettingsOpen = uiState.isSettingsOpen,
-                    onSelectTab = onSelectTab,
+                if (!hideChrome) {
+                    GhickinBottomNavBar(
+                        activeTab = uiState.activeTab,
+                        isSettingsOpen = uiState.isSettingsOpen,
+                        onSelectTab = onSelectTab,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveTimerVaultLockBanner(
+    timerState: StudyTimerGroupUiState,
+    onReturnToTimer: () -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val accent = timerState.activeSubjectMood.accent
+    val displaySec = if (timerState.mode == StudyTimerMode.POMODORO) {
+        timerState.remainingSeconds
+    } else {
+        timerState.elapsedSeconds
+    }
+    val tagLabel = timerState.activeSubjectName ?: "Tagless Focus"
+
+    Surface(
+        color = tokens.carbonSurface,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("vault_active_timer_lock_banner"),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(accent),
+            )
+            Icon(
+                imageVector = Icons.Rounded.Timer,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = formatDurationHms(displaySec),
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = "tnum",
+                ),
+                color = accent,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$tagLabel · Vault-Only Focus Lock",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = tokens.inkPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                timerState.syncedLectureTitle?.let { lec ->
+                    Text(
+                        text = "Synced: $lec",
+                        style = MicroTagMono,
+                        color = tokens.inkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } ?: Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = tokens.inkMuted,
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Text(
+                        text = "Other tabs paused until timer stops",
+                        style = MicroTagMono,
+                        color = tokens.inkMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = accent.copy(alpha = 0.16f),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.55f)),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .minimumInteractiveComponentSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = accent),
+                        role = Role.Button,
+                        onClick = onReturnToTimer,
+                    )
+                    .testTag("vault_return_to_timer_button"),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Text(
+                        text = "Return to Timer",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = accent,
+                    )
+                }
             }
         }
     }
@@ -508,6 +777,7 @@ private fun WorkspaceStage(
     onRetryMissedQuizQuestions: () -> Unit,
     onRetakeFullQuiz: () -> Unit,
     onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
+    phase163Actions: Phase163Actions,
 ) {
     val spatialSpring = spring<IntOffset>(
         dampingRatio = 0.88f,
@@ -533,13 +803,19 @@ private fun WorkspaceStage(
     ) { tab ->
         when (tab) {
             null -> SettingsScreen(
+                uiState = uiState,
                 activeTheme = uiState.appTheme,
                 activeMood = uiState.accentMood,
                 focusMode = uiState.focusMode,
+                ragHubState = uiState.settingsRagHubState,
                 isWideLayout = isWideLayout,
+                onSelectSection = phase163Actions.onSelectSettingsSection,
                 onSelectTheme = onSelectAppTheme,
                 onSelectAccentMood = onSelectAccentMood,
                 onToggleFocusMode = onToggleFocusMode,
+                onSelectRagFile = phase163Actions.onSelectSettingsRagFile,
+                onUpdateRagUserNote = phase163Actions.onUpdateSettingsRagUserNote,
+                onRunRagAiOptimization = phase163Actions.onRunSettingsRagAiOptimization,
                 onCloseSettings = onCloseSettings,
             )
 
@@ -563,6 +839,7 @@ private fun WorkspaceStage(
                 onStartTodaysNewStudy = onStartTodaysNewStudy,
                 onQuickOpenAiTutor = { onSelectTab(WorkspaceTab.AI_TUTOR) },
                 onQuickOpenQuizzes = { onSelectTab(WorkspaceTab.QUIZZES) },
+                onQuickOpenStudyTimer = { onSelectTab(WorkspaceTab.TIMER_GROUP) },
             )
 
             WorkspaceTab.BATCHES -> BatchesScreen(
@@ -666,14 +943,59 @@ private fun WorkspaceStage(
                 onResetDiagramZoom = onResetDiagramZoom,
             )
 
-            WorkspaceTab.DAILY_PLANNER,
-            WorkspaceTab.TIMER_GROUP,
-            -> PhasePlaceholderScreen(
-                tab = tab,
-                activeMood = uiState.accentMood,
+            WorkspaceTab.DAILY_PLANNER -> StandaloneDailyPlannerScreen(
+                state = uiState.standalonePlannerState,
                 isWideLayout = isWideLayout,
-                onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
-                onCycleAccentMood = onCycleAccentMood,
+                onOpenSettings = onOpenSettings,
+                onOpenRagInSettings = phase163Actions.onOpenSettingsAtRagFile,
+                onToggleAiPlanner = phase163Actions.onToggleStandaloneAiPlanner,
+                onReopenZeroContextWindow = phase163Actions.onReopenPlannerZeroContextWindow,
+                onSimulateFirstTimeIngestion = phase163Actions.onSimulateFirstTimePlannerIngestion,
+                onRefreshRag2 = phase163Actions.onRefreshPlannerRag2,
+                onRequestConfirmSchedule = phase163Actions.onRequestConfirmDailySchedule,
+                onToggleTaskCompleted = phase163Actions.onToggleStandaloneTaskCompleted,
+                onRequestAddTask = phase163Actions.onRequestAddStandaloneTask,
+                onRequestEditTask = phase163Actions.onRequestEditStandaloneTask,
+                onRequestCancelTask = phase163Actions.onRequestCancelStandaloneTask,
+                onUpdateGateTitle = phase163Actions.onUpdatePlannerGateTitle,
+                onUpdateGateTimeWindow = phase163Actions.onUpdatePlannerGateTimeWindow,
+                onUpdateGateReason = phase163Actions.onUpdatePlannerGateReason,
+                onSimulateGateOutcome = phase163Actions.onSimulatePlannerGateOutcome,
+                onApplyGateApproved = phase163Actions.onApplyPlannerGateApproved,
+                onAcceptGateCounterProposal = phase163Actions.onAcceptPlannerGateCounterProposal,
+                onDismissGate = phase163Actions.onDismissPlannerGate,
+                onDismissStatusNotice = phase163Actions.onDismissPlannerNotice,
+            )
+
+            WorkspaceTab.TIMER_GROUP -> StudyTimerAndGroupScreen(
+                state = uiState.studyTimerGroupState,
+                subjects = uiState.pwVaultState.subjectsByBatch[uiState.primaryBatchId].orEmpty(),
+                isWideLayout = isWideLayout,
+                onExitToHome = { onSelectTab(WorkspaceTab.HOME) },
+                onOpenVaultWhileTimerActive = phase163Actions.onOpenVaultWhileTimerActive,
+                onSelectMode = phase163Actions.onSelectTimerMode,
+                onSelectPomodoroStyle = phase163Actions.onSelectPomodoroStyle,
+                onApplyPomodoroPreset = phase163Actions.onApplyPomodoroPreset,
+                onSwitchPomodoroPhase = phase163Actions.onSwitchPomodoroPhase,
+                onAddFiveMinutes = phase163Actions.onAddFiveMinutesToTimer,
+                onRequestStartFromMainButton = phase163Actions.onRequestStartFromMainTimerButton,
+                onQuickStartSubject = phase163Actions.onQuickStartSubjectTimer,
+                onConfirmStartWithTag = phase163Actions.onConfirmStartTimerWithTag,
+                onSkipStartTagless = phase163Actions.onSkipStartTimerTagless,
+                onDismissStartTagDialog = phase163Actions.onDismissStartTagDialog,
+                onPauseResumeTimer = phase163Actions.onPauseOrResumeStudyTimer,
+                onResetTimer = phase163Actions.onResetStudyTimer,
+                onStopAndLogTimer = phase163Actions.onStopAndLogStudyTimer,
+                onSetSplitRatio = phase163Actions.onSetTimerSplitRatio,
+                onToggleGroupStudySplit = phase163Actions.onToggleGroupStudySplit,
+                onOpenStatsSheet = phase163Actions.onOpenTimerStatsSheet,
+                onCloseStatsSheet = phase163Actions.onCloseTimerStatsSheet,
+                onJoinGroup = phase163Actions.onJoinYptGroup,
+                onOpenCreateGroupDialog = phase163Actions.onOpenCreateYptGroupDialog,
+                onCloseCreateGroupDialog = phase163Actions.onCloseCreateYptGroupDialog,
+                onCreatePublicGroup = phase163Actions.onCreatePublicYptGroup,
+                onSelectUserStatus = phase163Actions.onSelectYptUserStatus,
+                onDismissLockNotice = phase163Actions.onDismissSingleTimerLockNotice,
             )
         }
     }
