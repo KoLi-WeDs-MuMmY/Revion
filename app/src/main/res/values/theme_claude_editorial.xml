@@ -19,4 +19,15 @@
     <color name="theme_claude_hairline_subtle">#14F4EFE6</color>
     <color name="theme_claude_hairline_specular">#38D97757</color>
     <color name="theme_claude_error">#FFF28B82</color>
+
+    <!-- Phase 1.6.2: Claude Editorial AI Tutor Chat Surface & Brand Tokens -->
+    <color name="theme_claude_chat_user_bubble">#FF342E28</color>
+    <color name="theme_claude_chat_assistant_surface">#FF211F1C</color>
+    <color name="theme_claude_chat_sidebar_bg">#FF161513</color>
+    <color name="theme_claude_chat_composer_bg">#FF292622</color>
+    <color name="theme_claude_chat_code_bg">#FF1D1B18</color>
+    <color name="theme_claude_chat_logo_primary">#FFD97757</color>
+    <color name="theme_claude_chat_logo_secondary">#FFF4EFE6</color>
+    <dimen name="theme_claude_chat_composer_radius">20dp</dimen>
+    <dimen name="theme_claude_chat_bubble_radius">16dp</dimen>
 </resources>

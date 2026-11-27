@@ -1,20 +1,28 @@
 package com.example.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.diagram.PrivateDiagramStore
+import com.example.data.mock.Phase162MockData
+import com.example.model.ActiveQuizSession
 import com.example.model.AiPermissionRequest
 import com.example.model.BatchChapter
 import com.example.model.BatchCrudDialog
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
+import com.example.model.ChapterDiagramRef
 import com.example.model.CounterProposal
 import com.example.model.DailyFlashcardItem
 import com.example.model.DailyPageRoute
 import com.example.model.DailyRevisionBrief
+import com.example.model.DiagramAttachment
+import com.example.model.DiagramViewerState
 import com.example.model.FlashcardHubMode
 import com.example.model.FlashcardRating
 import com.example.model.FlashcardsMistakesUiState
 import com.example.model.FocusMode
+import com.example.model.GrokTutorUiState
 import com.example.model.HomeCommandState
 import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
@@ -31,7 +39,9 @@ import com.example.model.PlannerApprovalStatus
 import com.example.model.PlannerBlock
 import com.example.model.PlannerBlockCategory
 import com.example.model.PresetSubjectTemplate
+import com.example.model.PwQuizArenaUiState
 import com.example.model.PwVaultUiState
+import com.example.model.QuizAttemptSummary
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
 import com.example.model.RevisionQuizUiState
@@ -40,6 +50,9 @@ import com.example.model.SpacedIntervalBucket
 import com.example.model.SpacedReviewItem
 import com.example.model.StudyBatch
 import com.example.model.SubjectMastery
+import com.example.model.TestArenaMode
+import com.example.model.TutorChatMessage
+import com.example.model.TutorChatSession
 import com.example.model.TutorMessage
 import com.example.model.TutorPlannerMode
 import com.example.model.TutorPlannerUiState
@@ -50,6 +63,7 @@ import com.example.model.VaultMaterial
 import com.example.model.VaultPaletteFocus
 import com.example.model.VaultSubjectNode
 import com.example.model.VaultUiState
+import com.example.model.WeakTopicDiagnostic
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.model.formatClockMinutes
@@ -63,13 +77,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class WorkspaceViewModel : ViewModel() {
+class WorkspaceViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val diagramStore = PrivateDiagramStore(application.applicationContext)
 
     private val _uiState = MutableStateFlow(createInitialMockState())
     val uiState: StateFlow<WorkspaceUiState> = _uiState.asStateFlow()
 
     private var tutorReplyJob: Job? = null
+    private var grokTutorReplyJob: Job? = null
     private var permissionEvalJob: Job? = null
+    private var examTimerJob: Job? = null
 
     // --- Phase 1.1 Workspace & Home Actions ---
 
@@ -2224,6 +2242,670 @@ class WorkspaceViewModel : ViewModel() {
         return (listOf(id) + existing.filterNot { it == id }).take(6)
     }
 
+    // --- Phase 1.6.2: Grok-Style AI Tutor & Image-Code Web Viewer Actions ---
+
+    fun toggleTutorSidebar() {
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    isSidebarExpanded = !state.grokTutorState.isSidebarExpanded,
+                ),
+            )
+        }
+    }
+
+    fun closeTutorSidebar() {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(isSidebarExpanded = false))
+        }
+    }
+
+    fun startNewTutorChat() {
+        grokTutorReplyJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    activeSessionId = null,
+                    draftBatchId = state.primaryBatchId,
+                    draftLinkedChapterIds = emptyList(),
+                    composerText = "",
+                    isGeneratingReply = false,
+                    isSidebarExpanded = false,
+                    viewerState = DiagramViewerState(),
+                ),
+            )
+        }
+    }
+
+    fun selectTutorSession(sessionId: String) {
+        grokTutorReplyJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    activeSessionId = sessionId,
+                    composerText = "",
+                    isGeneratingReply = false,
+                    viewerState = DiagramViewerState(),
+                ),
+            )
+        }
+    }
+
+    fun openTutorChapterPicker() {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(isChapterPickerOpen = true))
+        }
+    }
+
+    fun closeTutorChapterPicker() {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(isChapterPickerOpen = false))
+        }
+    }
+
+    fun confirmTutorLinkedChapters(batchId: String, chapterIds: List<String>) {
+        if (chapterIds.isEmpty()) return
+        _uiState.update { state ->
+            val tutor = state.grokTutorState
+            val activeId = tutor.activeSessionId
+            if (activeId == null) {
+                state.copy(
+                    grokTutorState = tutor.copy(
+                        draftBatchId = batchId,
+                        draftLinkedChapterIds = chapterIds,
+                        isChapterPickerOpen = false,
+                    ),
+                )
+            } else {
+                state.copy(
+                    grokTutorState = tutor.copy(
+                        sessions = tutor.sessions.map { sess ->
+                            if (sess.id != activeId) sess else sess.copy(
+                                batchId = batchId,
+                                linkedChapterIds = chapterIds,
+                            )
+                        },
+                        isChapterPickerOpen = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun openTutorRagIndexDialog() {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(isRagIndexDialogOpen = true))
+        }
+    }
+
+    fun closeTutorRagIndexDialog() {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(isRagIndexDialogOpen = false))
+        }
+    }
+
+    fun updateTutorComposerText(text: String) {
+        _uiState.update { state ->
+            state.copy(grokTutorState = state.grokTutorState.copy(composerText = text))
+        }
+    }
+
+    fun sendGrokTutorPrompt(rawPrompt: String) {
+        val cleanPrompt = rawPrompt.trim()
+        if (cleanPrompt.isEmpty()) return
+
+        val snapshot = _uiState.value
+        val tutor = snapshot.grokTutorState
+        val linkedIds = tutor.currentLinkedChapterIds
+        if (linkedIds.isEmpty()) {
+            openTutorChapterPicker()
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val userMessage = TutorChatMessage(
+            id = "u_$now",
+            isUser = true,
+            visibleText = cleanPrompt,
+            timestampLabel = "Just now",
+        )
+
+        val targetSessionId = tutor.activeSessionId ?: "chat_$now"
+        val isBrandNewSession = tutor.activeSessionId == null
+
+        _uiState.update { state ->
+            val currentTutor = state.grokTutorState
+            val updatedSessions = if (isBrandNewSession) {
+                val newSession = TutorChatSession(
+                    id = targetSessionId,
+                    title = cleanPrompt.take(40).let { if (cleanPrompt.length > 40) "$it…" else it },
+                    batchId = currentTutor.draftBatchId,
+                    linkedChapterIds = linkedIds,
+                    messages = listOf(userMessage),
+                    updatedAtLabel = "Just now",
+                    updatedAtMillis = now,
+                )
+                listOf(newSession) + currentTutor.sessions
+            } else {
+                currentTutor.sessions.map { sess ->
+                    if (sess.id != targetSessionId) sess else sess.copy(
+                        messages = sess.messages + userMessage,
+                        updatedAtLabel = "Just now",
+                        updatedAtMillis = now,
+                    )
+                }
+            }
+            state.copy(
+                grokTutorState = currentTutor.copy(
+                    sessions = updatedSessions,
+                    activeSessionId = targetSessionId,
+                    composerText = "",
+                    isGeneratingReply = true,
+                ),
+            )
+        }
+
+        grokTutorReplyJob?.cancel()
+        grokTutorReplyJob = viewModelScope.launch {
+            delay(460L)
+            val current = _uiState.value
+            val allChapters = current.pwVaultState.subjectsByBatch.values.flatten().flatMap { it.chapters }
+            val sessionChapters = linkedIds.mapNotNull { id -> allChapters.firstOrNull { it.id == id } }
+
+            val turn = Phase162MockData.synthesizeChapterRagResponse(
+                userPrompt = cleanPrompt,
+                linkedChapters = sessionChapters,
+                catalog = current.grokTutorState.diagramCatalog,
+                diagramStore = diagramStore,
+            )
+
+            val aiMessage = TutorChatMessage(
+                id = "a_${System.currentTimeMillis()}",
+                isUser = false,
+                visibleText = turn.visibleText,
+                formulaBlock = turn.formulaBlock,
+                citations = turn.citations,
+                diagramAttachment = turn.matchedDiagram,
+                invisiblePromptUsed = turn.invisiblePromptUsed,
+                timestampLabel = "Just now",
+            )
+
+            _uiState.update { state ->
+                val t = state.grokTutorState
+                val updatedCatalog = if (turn.newlyCatalogedRef != null &&
+                    t.diagramCatalog.none { it.fileName == turn.newlyCatalogedRef.fileName }
+                ) {
+                    t.diagramCatalog + turn.newlyCatalogedRef
+                } else {
+                    t.diagramCatalog
+                }
+                state.copy(
+                    grokTutorState = t.copy(
+                        sessions = t.sessions.map { sess ->
+                            if (sess.id != targetSessionId) sess else sess.copy(
+                                messages = sess.messages + aiMessage,
+                                updatedAtLabel = "Just now",
+                                updatedAtMillis = System.currentTimeMillis(),
+                            )
+                        },
+                        diagramCatalog = updatedCatalog,
+                        isGeneratingReply = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun openDiagramModal(attachment: DiagramAttachment) {
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    viewerState = DiagramViewerState(
+                        attachment = attachment,
+                        isSplitScreen = false,
+                        isFullModalOpen = true,
+                        zoomPercent = 100,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun openDiagramSplitScreen(attachment: DiagramAttachment) {
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    isSidebarExpanded = false,
+                    viewerState = DiagramViewerState(
+                        attachment = attachment,
+                        isSplitScreen = true,
+                        isFullModalOpen = false,
+                        zoomPercent = 100,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun previewCatalogDiagram(ref: ChapterDiagramRef) {
+        val attachment = DiagramAttachment(
+            fileName = ref.fileName,
+            title = ref.title,
+            chapterTitle = ref.chapterTitle,
+            summary = ref.summary,
+            generatedOnTheFly = !ref.isPreseeded,
+        )
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    isRagIndexDialogOpen = false,
+                    viewerState = DiagramViewerState(
+                        attachment = attachment,
+                        isSplitScreen = false,
+                        isFullModalOpen = true,
+                        zoomPercent = 100,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun toggleDiagramSplitScreen() {
+        _uiState.update { state ->
+            val v = state.grokTutorState.viewerState
+            if (v.attachment == null) return@update state
+            val nextSplit = !v.isSplitScreen
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    isSidebarExpanded = if (nextSplit) false else state.grokTutorState.isSidebarExpanded,
+                    viewerState = v.copy(
+                        isSplitScreen = nextSplit,
+                        isFullModalOpen = !nextSplit,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun closeDiagramViewer() {
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    viewerState = DiagramViewerState(),
+                ),
+            )
+        }
+    }
+
+    fun zoomDiagram(deltaPercent: Int) {
+        _uiState.update { state ->
+            val v = state.grokTutorState.viewerState
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    viewerState = v.copy(zoomPercent = (v.zoomPercent + deltaPercent).coerceIn(70, 200)),
+                ),
+            )
+        }
+    }
+
+    fun resetDiagramZoom() {
+        _uiState.update { state ->
+            state.copy(
+                grokTutorState = state.grokTutorState.copy(
+                    viewerState = state.grokTutorState.viewerState.copy(zoomPercent = 100),
+                ),
+            )
+        }
+    }
+
+    fun jumpFromWeakTopicToTutor(batchId: String, chapterId: String) {
+        examTimerJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                activeTab = WorkspaceTab.AI_TUTOR,
+                isSettingsOpen = false,
+                pwQuizArenaState = state.pwQuizArenaState.copy(activeSession = null),
+                grokTutorState = state.grokTutorState.copy(
+                    activeSessionId = null,
+                    draftBatchId = batchId,
+                    draftLinkedChapterIds = listOf(chapterId),
+                    isSidebarExpanded = false,
+                    isChapterPickerOpen = false,
+                    composerText = "Help me fix my mistakes in this chapter with a clear diagram.",
+                ),
+            )
+        }
+    }
+
+    // --- Phase 1.6.2: PW-Style Quizzes Arena (+4 / -1 Exam Mode & Normal Mode) ---
+
+    fun cycleQuizArenaBatch() {
+        _uiState.update { state ->
+            val batches = state.batchesState.batches
+            if (batches.isEmpty()) return@update state
+            val idx = batches.indexOfFirst { it.id == state.pwQuizArenaState.selectedBatchId }
+            val nextBatch = batches[(idx + 1) % batches.size]
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    selectedBatchId = nextBatch.id,
+                    selectedSubjectId = null,
+                    selectedChapterId = null,
+                ),
+            )
+        }
+    }
+
+    fun selectQuizArenaSubject(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    selectedSubjectId = subjectId,
+                    selectedChapterId = null,
+                ),
+            )
+        }
+    }
+
+    fun requestStartChapterQuiz(subjectId: String, chapterId: String) {
+        _uiState.update { state ->
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    pendingModeGateSubjectId = subjectId,
+                    pendingModeGateChapterId = chapterId,
+                ),
+            )
+        }
+    }
+
+    fun dismissQuizModeGate() {
+        _uiState.update { state ->
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    pendingModeGateSubjectId = null,
+                    pendingModeGateChapterId = null,
+                ),
+            )
+        }
+    }
+
+    fun confirmStartQuizMode(mode: TestArenaMode) {
+        val state = _uiState.value
+        val arena = state.pwQuizArenaState
+        val chapterId = arena.pendingModeGateChapterId ?: return
+        val batchSubjects = state.pwVaultState.subjectsByBatch[arena.selectedBatchId].orEmpty()
+        val chapter = batchSubjects.flatMap { it.chapters }.firstOrNull { it.id == chapterId }
+            ?: state.pwVaultState.subjectsByBatch.values.flatten().flatMap { it.chapters }.firstOrNull { it.id == chapterId }
+            ?: return
+
+        val questions = Phase162MockData.questionsForChapter(chapter)
+        startQuizSessionInternal(
+            batchId = chapter.batchId,
+            subjectId = chapter.subjectId,
+            chapterId = chapter.id,
+            subjectName = chapter.subjectName,
+            chapterTitle = chapter.title,
+            mode = mode,
+            questions = questions,
+        )
+    }
+
+    private fun startQuizSessionInternal(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        subjectName: String,
+        chapterTitle: String,
+        mode: TestArenaMode,
+        questions: List<com.example.model.ArenaQuestion>,
+    ) {
+        examTimerJob?.cancel()
+        val durationSec = if (mode == TestArenaMode.EXAM) (questions.size * 120).coerceAtLeast(240) else 0
+        val session = ActiveQuizSession(
+            sessionId = "quiz_${System.currentTimeMillis()}",
+            batchId = batchId,
+            subjectId = subjectId,
+            chapterId = chapterId,
+            subjectName = subjectName,
+            chapterTitle = chapterTitle,
+            mode = mode,
+            questions = questions,
+            currentIndex = 0,
+            selectedAnswers = emptyMap(),
+            markedForReview = emptySet(),
+            revealedNormalIndices = emptySet(),
+            remainingSeconds = durationSec,
+            totalDurationSeconds = durationSec,
+            isSubmitted = false,
+            isPaletteOpen = false,
+            summary = null,
+        )
+        _uiState.update { s ->
+            s.copy(
+                pwQuizArenaState = s.pwQuizArenaState.copy(
+                    pendingModeGateChapterId = null,
+                    pendingModeGateSubjectId = null,
+                    activeSession = session,
+                ),
+            )
+        }
+
+        if (mode == TestArenaMode.EXAM) {
+            examTimerJob = viewModelScope.launch {
+                while (true) {
+                    delay(1000L)
+                    val active = _uiState.value.pwQuizArenaState.activeSession
+                    if (active == null || active.isSubmitted || active.mode != TestArenaMode.EXAM) {
+                        break
+                    }
+                    if (active.remainingSeconds <= 1) {
+                        submitQuizArenaSession()
+                        break
+                    }
+                    _uiState.update { st ->
+                        val cur = st.pwQuizArenaState.activeSession ?: return@update st
+                        st.copy(
+                            pwQuizArenaState = st.pwQuizArenaState.copy(
+                                activeSession = cur.copy(remainingSeconds = (cur.remainingSeconds - 1).coerceAtLeast(0)),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun selectQuizArenaOption(optionIndex: Int) {
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            if (session.isSubmitted) return@update state
+            val idx = session.currentIndex
+            val nextAnswers = session.selectedAnswers + (idx to optionIndex)
+            val nextRevealed = if (session.mode == TestArenaMode.NORMAL) {
+                session.revealedNormalIndices + idx
+            } else {
+                session.revealedNormalIndices
+            }
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(
+                        selectedAnswers = nextAnswers,
+                        revealedNormalIndices = nextRevealed,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun clearQuizArenaOption() {
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            if (session.isSubmitted || session.mode != TestArenaMode.EXAM) return@update state
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(
+                        selectedAnswers = session.selectedAnswers - session.currentIndex,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun toggleQuizMarkForReview() {
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            val idx = session.currentIndex
+            val nextMarked = if (idx in session.markedForReview) {
+                session.markedForReview - idx
+            } else {
+                session.markedForReview + idx
+            }
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(markedForReview = nextMarked),
+                ),
+            )
+        }
+    }
+
+    fun jumpToQuizQuestion(index: Int) {
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            val clamped = index.coerceIn(0, (session.questions.size - 1).coerceAtLeast(0))
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(currentIndex = clamped),
+                ),
+            )
+        }
+    }
+
+    fun toggleQuizPalette() {
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(isPaletteOpen = !session.isPaletteOpen),
+                ),
+            )
+        }
+    }
+
+    fun submitQuizArenaSession() {
+        examTimerJob?.cancel()
+        _uiState.update { state ->
+            val session = state.pwQuizArenaState.activeSession ?: return@update state
+            if (session.isSubmitted) return@update state
+
+            var correct = 0
+            var wrong = 0
+            var unattempted = 0
+
+            val missedByTopic = mutableMapOf<String, Int>()
+            val totalByTopic = mutableMapOf<String, Int>()
+
+            session.questions.forEachIndexed { idx, q ->
+                totalByTopic[q.topicName] = (totalByTopic[q.topicName] ?: 0) + 1
+                val pick = session.selectedAnswers[idx]
+                when {
+                    pick == null -> {
+                        unattempted++
+                        missedByTopic[q.topicName] = (missedByTopic[q.topicName] ?: 0) + 1
+                    }
+                    pick == q.correctIndex -> correct++
+                    else -> {
+                        wrong++
+                        missedByTopic[q.topicName] = (missedByTopic[q.topicName] ?: 0) + 1
+                    }
+                }
+            }
+
+            val attempted = correct + wrong
+            val accuracy = if (attempted == 0) 0 else (correct * 100) / attempted
+            val netScore = if (session.mode == TestArenaMode.EXAM) (correct * 4 - wrong) else correct
+            val maxScore = if (session.mode == TestArenaMode.EXAM) (session.questions.size * 4) else session.questions.size
+
+            val weakTopics = missedByTopic.entries
+                .filter { it.value > 0 }
+                .map { (topic, missed) ->
+                    WeakTopicDiagnostic(
+                        chapterId = session.chapterId,
+                        chapterTitle = session.chapterTitle,
+                        topicName = topic,
+                        missedCount = missed,
+                        totalCount = totalByTopic[topic] ?: missed,
+                    )
+                }
+
+            val summary = QuizAttemptSummary(
+                id = "att_${System.currentTimeMillis()}",
+                batchId = session.batchId,
+                subjectId = session.subjectId,
+                chapterId = session.chapterId,
+                subjectName = session.subjectName,
+                chapterTitle = session.chapterTitle,
+                mode = session.mode,
+                correctCount = correct,
+                wrongCount = wrong,
+                unattemptedCount = unattempted,
+                netScore = netScore,
+                maxScore = maxScore,
+                accuracyPercent = accuracy,
+                weakTopics = weakTopics,
+                timestampLabel = "Just now · ${session.mode.badge}",
+            )
+
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(
+                    activeSession = session.copy(
+                        isSubmitted = true,
+                        isPaletteOpen = false,
+                        summary = summary,
+                    ),
+                    recentAttempts = (listOf(summary) + state.pwQuizArenaState.recentAttempts).take(8),
+                ),
+            )
+        }
+    }
+
+    fun exitQuizArenaSession() {
+        examTimerJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                pwQuizArenaState = state.pwQuizArenaState.copy(activeSession = null),
+            )
+        }
+    }
+
+    fun retryMissedQuizQuestions() {
+        val session = _uiState.value.pwQuizArenaState.activeSession ?: return
+        val missedQuestions = session.questions.filterIndexed { idx, q ->
+            session.selectedAnswers[idx] != q.correctIndex
+        }
+        if (missedQuestions.isEmpty()) return
+        startQuizSessionInternal(
+            batchId = session.batchId,
+            subjectId = session.subjectId,
+            chapterId = session.chapterId,
+            subjectName = session.subjectName,
+            chapterTitle = session.chapterTitle,
+            mode = session.mode,
+            questions = missedQuestions,
+        )
+    }
+
+    fun retakeFullQuizArena() {
+        val session = _uiState.value.pwQuizArenaState.activeSession ?: return
+        startQuizSessionInternal(
+            batchId = session.batchId,
+            subjectId = session.subjectId,
+            chapterId = session.chapterId,
+            subjectName = session.subjectName,
+            chapterTitle = session.chapterTitle,
+            mode = session.mode,
+            questions = session.questions,
+        )
+    }
+
     // --- Layered Back Navigation ---
 
     fun navigateBackToHome() {
@@ -2234,6 +2916,30 @@ class WorkspaceViewModel : ViewModel() {
                 state.homeCommandState.activeDailyPage != null ->
                     state.copy(homeCommandState = state.homeCommandState.copy(activeDailyPage = null, isActiveFlashcardFlipped = false))
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
+                state.activeTab == WorkspaceTab.AI_TUTOR && state.grokTutorState.viewerState.isFullModalOpen ->
+                    state.copy(grokTutorState = state.grokTutorState.copy(viewerState = DiagramViewerState()))
+                state.activeTab == WorkspaceTab.AI_TUTOR && state.grokTutorState.viewerState.isSplitScreen ->
+                    state.copy(grokTutorState = state.grokTutorState.copy(viewerState = DiagramViewerState()))
+                state.activeTab == WorkspaceTab.AI_TUTOR && state.grokTutorState.isChapterPickerOpen ->
+                    state.copy(grokTutorState = state.grokTutorState.copy(isChapterPickerOpen = false))
+                state.activeTab == WorkspaceTab.AI_TUTOR && state.grokTutorState.isRagIndexDialogOpen ->
+                    state.copy(grokTutorState = state.grokTutorState.copy(isRagIndexDialogOpen = false))
+                state.activeTab == WorkspaceTab.AI_TUTOR && state.grokTutorState.isSidebarExpanded ->
+                    state.copy(grokTutorState = state.grokTutorState.copy(isSidebarExpanded = false))
+                state.activeTab == WorkspaceTab.QUIZZES && state.pwQuizArenaState.pendingModeGateChapterId != null ->
+                    state.copy(pwQuizArenaState = state.pwQuizArenaState.copy(pendingModeGateChapterId = null, pendingModeGateSubjectId = null))
+                state.activeTab == WorkspaceTab.QUIZZES && state.pwQuizArenaState.activeSession?.isPaletteOpen == true ->
+                    state.copy(
+                        pwQuizArenaState = state.pwQuizArenaState.copy(
+                            activeSession = state.pwQuizArenaState.activeSession.copy(isPaletteOpen = false),
+                        ),
+                    )
+                state.activeTab == WorkspaceTab.QUIZZES && state.pwQuizArenaState.activeSession != null -> {
+                    examTimerJob?.cancel()
+                    state.copy(pwQuizArenaState = state.pwQuizArenaState.copy(activeSession = null))
+                }
+                state.activeTab == WorkspaceTab.QUIZZES && state.pwQuizArenaState.selectedSubjectId != null ->
+                    state.copy(pwQuizArenaState = state.pwQuizArenaState.copy(selectedSubjectId = null))
                 state.activeTab == WorkspaceTab.BATCHES && state.batchesState.activeCrudDialog != null ->
                     state.copy(batchesState = state.batchesState.copy(activeCrudDialog = null))
                 state.activeTab == WorkspaceTab.BATCHES && state.batchesState.isBuilderOpen ->
@@ -2541,6 +3247,18 @@ class WorkspaceViewModel : ViewModel() {
                 selectedChapterId = Phase15MockData.createChapters().first().id,
                 messagesByChapter = Phase15MockData.createInitialMessages(),
                 blocks = Phase15MockData.createInitialPlannerBlocks(),
+            ),
+            grokTutorState = GrokTutorUiState(
+                sessions = Phase162MockData.initialTutorSessions(),
+                activeSessionId = null,
+                draftBatchId = firstBatch.id,
+                draftLinkedChapterIds = emptyList(),
+                isSidebarExpanded = false,
+                diagramCatalog = Phase162MockData.initialDiagramCatalog(),
+            ),
+            pwQuizArenaState = PwQuizArenaUiState(
+                selectedBatchId = firstBatch.id,
+                recentAttempts = Phase162MockData.initialRecentQuizAttempts(),
             ),
         )
     }

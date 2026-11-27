@@ -1,6 +1,7 @@
 package com.example.ui.theme
 
 import androidx.annotation.ColorRes
+import androidx.annotation.DimenRes
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import com.example.R
@@ -36,8 +37,8 @@ val FeedbackIncorrectContainer = Color(0xFF241114)
 
 /**
  * Modular Workspace Themes — each theme binds to its own standalone XML color
- * resource file under res/values/theme_*.xml, paired with a curated font family
- * and theme-matched daily card artwork.
+ * resource file under res/values/theme_*.xml, paired with a curated font family,
+ * theme-matched daily card artwork, and dedicated AI Tutor chat surface tokens.
  */
 enum class AppThemeId(
     val id: String,
@@ -63,6 +64,15 @@ enum class AppThemeId(
     @ColorRes val hairlineSubtleRes: Int,
     @ColorRes val hairlineSpecularRes: Int,
     @ColorRes val errorRes: Int,
+    @ColorRes val chatUserBubbleRes: Int,
+    @ColorRes val chatAssistantSurfaceRes: Int,
+    @ColorRes val chatSidebarBgRes: Int,
+    @ColorRes val chatComposerBgRes: Int,
+    @ColorRes val chatCodeBgRes: Int,
+    @ColorRes val chatLogoPrimaryRes: Int,
+    @ColorRes val chatLogoSecondaryRes: Int,
+    @DimenRes val chatComposerRadiusRes: Int,
+    @DimenRes val chatBubbleRadiusRes: Int,
 ) {
     GROK_BLACK(
         id = "grok_black",
@@ -88,6 +98,15 @@ enum class AppThemeId(
         hairlineSubtleRes = R.color.theme_grok_hairline_subtle,
         hairlineSpecularRes = R.color.theme_grok_hairline_specular,
         errorRes = R.color.theme_grok_error,
+        chatUserBubbleRes = R.color.theme_grok_chat_user_bubble,
+        chatAssistantSurfaceRes = R.color.theme_grok_chat_assistant_surface,
+        chatSidebarBgRes = R.color.theme_grok_chat_sidebar_bg,
+        chatComposerBgRes = R.color.theme_grok_chat_composer_bg,
+        chatCodeBgRes = R.color.theme_grok_chat_code_bg,
+        chatLogoPrimaryRes = R.color.theme_grok_chat_logo_primary,
+        chatLogoSecondaryRes = R.color.theme_grok_chat_logo_secondary,
+        chatComposerRadiusRes = R.dimen.theme_grok_chat_composer_radius,
+        chatBubbleRadiusRes = R.dimen.theme_grok_chat_bubble_radius,
     ),
     CLAUDE_EDITORIAL(
         id = "claude_editorial",
@@ -113,6 +132,15 @@ enum class AppThemeId(
         hairlineSubtleRes = R.color.theme_claude_hairline_subtle,
         hairlineSpecularRes = R.color.theme_claude_hairline_specular,
         errorRes = R.color.theme_claude_error,
+        chatUserBubbleRes = R.color.theme_claude_chat_user_bubble,
+        chatAssistantSurfaceRes = R.color.theme_claude_chat_assistant_surface,
+        chatSidebarBgRes = R.color.theme_claude_chat_sidebar_bg,
+        chatComposerBgRes = R.color.theme_claude_chat_composer_bg,
+        chatCodeBgRes = R.color.theme_claude_chat_code_bg,
+        chatLogoPrimaryRes = R.color.theme_claude_chat_logo_primary,
+        chatLogoSecondaryRes = R.color.theme_claude_chat_logo_secondary,
+        chatComposerRadiusRes = R.dimen.theme_claude_chat_composer_radius,
+        chatBubbleRadiusRes = R.dimen.theme_claude_chat_bubble_radius,
     ),
     PAPER_LIGHT(
         id = "paper_light",
@@ -138,6 +166,15 @@ enum class AppThemeId(
         hairlineSubtleRes = R.color.theme_paper_hairline_subtle,
         hairlineSpecularRes = R.color.theme_paper_hairline_specular,
         errorRes = R.color.theme_paper_error,
+        chatUserBubbleRes = R.color.theme_paper_chat_user_bubble,
+        chatAssistantSurfaceRes = R.color.theme_paper_chat_assistant_surface,
+        chatSidebarBgRes = R.color.theme_paper_chat_sidebar_bg,
+        chatComposerBgRes = R.color.theme_paper_chat_composer_bg,
+        chatCodeBgRes = R.color.theme_paper_chat_code_bg,
+        chatLogoPrimaryRes = R.color.theme_paper_chat_logo_primary,
+        chatLogoSecondaryRes = R.color.theme_paper_chat_logo_secondary,
+        chatComposerRadiusRes = R.dimen.theme_paper_chat_composer_radius,
+        chatBubbleRadiusRes = R.dimen.theme_paper_chat_bubble_radius,
     ),
     SLATE(
         id = "slate",
@@ -163,6 +200,15 @@ enum class AppThemeId(
         hairlineSubtleRes = R.color.theme_slate_hairline_subtle,
         hairlineSpecularRes = R.color.theme_slate_hairline_specular,
         errorRes = R.color.theme_slate_error,
+        chatUserBubbleRes = R.color.theme_slate_chat_user_bubble,
+        chatAssistantSurfaceRes = R.color.theme_slate_chat_assistant_surface,
+        chatSidebarBgRes = R.color.theme_slate_chat_sidebar_bg,
+        chatComposerBgRes = R.color.theme_slate_chat_composer_bg,
+        chatCodeBgRes = R.color.theme_slate_chat_code_bg,
+        chatLogoPrimaryRes = R.color.theme_slate_chat_logo_primary,
+        chatLogoSecondaryRes = R.color.theme_slate_chat_logo_secondary,
+        chatComposerRadiusRes = R.dimen.theme_slate_chat_composer_radius,
+        chatBubbleRadiusRes = R.dimen.theme_slate_chat_bubble_radius,
     ),
 }
 

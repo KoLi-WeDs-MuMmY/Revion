@@ -19,4 +19,15 @@
     <color name="theme_paper_hairline_subtle">#131A1917</color>
     <color name="theme_paper_hairline_specular">#34C4623E</color>
     <color name="theme_paper_error">#FFC62828</color>
+
+    <!-- Phase 1.6.2: Paper Light AI Tutor Chat Surface & Brand Tokens -->
+    <color name="theme_paper_chat_user_bubble">#FFEBE4D7</color>
+    <color name="theme_paper_chat_assistant_surface">#FFFFFFFF</color>
+    <color name="theme_paper_chat_sidebar_bg">#FFF2EDE4</color>
+    <color name="theme_paper_chat_composer_bg">#FFFFFFFF</color>
+    <color name="theme_paper_chat_code_bg">#FFF5F0E6</color>
+    <color name="theme_paper_chat_logo_primary">#FFC4623E</color>
+    <color name="theme_paper_chat_logo_secondary">#FF1A1917</color>
+    <dimen name="theme_paper_chat_composer_radius">20dp</dimen>
+    <dimen name="theme_paper_chat_bubble_radius">16dp</dimen>
 </resources>

@@ -19,4 +19,15 @@
     <color name="theme_grok_hairline_subtle">#10FFFFFF</color>
     <color name="theme_grok_hairline_specular">#2EFFFFFF</color>
     <color name="theme_grok_error">#FFF87171</color>
+
+    <!-- Phase 1.6.2: Grok AI Tutor Chat Surface & Brand Tokens -->
+    <color name="theme_grok_chat_user_bubble">#FF1A1A1F</color>
+    <color name="theme_grok_chat_assistant_surface">#FF08080A</color>
+    <color name="theme_grok_chat_sidebar_bg">#FF060608</color>
+    <color name="theme_grok_chat_composer_bg">#FF101014</color>
+    <color name="theme_grok_chat_code_bg">#FF141418</color>
+    <color name="theme_grok_chat_logo_primary">#FFFFFFFF</color>
+    <color name="theme_grok_chat_logo_secondary">#FF71717A</color>
+    <dimen name="theme_grok_chat_composer_radius">24dp</dimen>
+    <dimen name="theme_grok_chat_bubble_radius">18dp</dimen>
 </resources>

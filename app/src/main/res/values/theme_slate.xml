@@ -19,4 +19,15 @@
     <color name="theme_slate_hairline_subtle">#12E6EDF3</color>
     <color name="theme_slate_hairline_specular">#3879B8FF</color>
     <color name="theme_slate_error">#FFF97583</color>
+
+    <!-- Phase 1.6.2: Slate AI Tutor Chat Surface & Brand Tokens -->
+    <color name="theme_slate_chat_user_bubble">#FF222D3D</color>
+    <color name="theme_slate_chat_assistant_surface">#FF131922</color>
+    <color name="theme_slate_chat_sidebar_bg">#FF0B0F14</color>
+    <color name="theme_slate_chat_composer_bg">#FF18202C</color>
+    <color name="theme_slate_chat_code_bg">#FF11161F</color>
+    <color name="theme_slate_chat_logo_primary">#FF79B8FF</color>
+    <color name="theme_slate_chat_logo_secondary">#FFE6EDF3</color>
+    <dimen name="theme_slate_chat_composer_radius">18dp</dimen>
+    <dimen name="theme_slate_chat_bubble_radius">14dp</dimen>
 </resources>

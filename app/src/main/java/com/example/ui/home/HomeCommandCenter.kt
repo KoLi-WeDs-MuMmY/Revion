@@ -34,12 +34,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Quiz
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -104,6 +106,8 @@ fun HomeCommandCenter(
     onToggleTodayFlashcardsCompleted: () -> Unit,
     onToggleStudyGateTestOverride: () -> Unit,
     onStartTodaysNewStudy: () -> Unit,
+    onQuickOpenAiTutor: () -> Unit = {},
+    onQuickOpenQuizzes: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeState = uiState.homeCommandState
@@ -147,6 +151,8 @@ fun HomeCommandCenter(
                 onToggleTodayFlashcardsCompleted = onToggleTodayFlashcardsCompleted,
                 onToggleStudyGateTestOverride = onToggleStudyGateTestOverride,
                 onStartTodaysNewStudy = onStartTodaysNewStudy,
+                onQuickOpenAiTutor = onQuickOpenAiTutor,
+                onQuickOpenQuizzes = onQuickOpenQuizzes,
             )
         }
     }
@@ -164,6 +170,8 @@ private fun HomeCommandCanvas(
     onToggleTodayFlashcardsCompleted: () -> Unit,
     onToggleStudyGateTestOverride: () -> Unit,
     onStartTodaysNewStudy: () -> Unit,
+    onQuickOpenAiTutor: () -> Unit,
+    onQuickOpenQuizzes: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val primaryBatch = uiState.primaryBatch
@@ -295,6 +303,37 @@ private fun HomeCommandCanvas(
                 }
             }
 
+            // Section 1.5: Studio Quick-Launch Strip (AI Tutor & Quiz Arena)
+            item(key = "home_studio_quick_launch") {
+                StaggeredEntrance(delayMillis = 75L) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(if (isWideLayout) 16.dp else 10.dp),
+                    ) {
+                        StudioQuickLaunchTile(
+                            title = stringResource(R.string.home_quick_launch_tutor),
+                            subtitle = "Chapter RAG & Interactive Diagrams",
+                            badge = "${uiState.grokTutorState.diagramCatalog.size} DIAGRAMS",
+                            icon = Icons.Rounded.AutoAwesome,
+                            accent = tokens.themeAccent,
+                            testTag = "home_quick_launch_tutor",
+                            onClick = onQuickOpenAiTutor,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StudioQuickLaunchTile(
+                            title = stringResource(R.string.home_quick_launch_quizzes),
+                            subtitle = "Exam Mode (+4/−1) & Weak Topics",
+                            badge = "${uiState.pwQuizArenaState.recentAttempts.size} RECENT",
+                            icon = Icons.Rounded.Quiz,
+                            accent = AccentMood.AMBER.accent,
+                            testTag = "home_quick_launch_quizzes",
+                            onClick = onQuickOpenQuizzes,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+
             // Section 2: Theme-Matched Daily Cards — Today's Revision & Today's Flashcards
             item(key = "home_daily_cards") {
                 StaggeredEntrance(delayMillis = 100L) {
@@ -409,6 +448,7 @@ private fun PrimaryBatchSyllabusCard(
             .fillMaxWidth()
             .testTag("home_primary_batch_card"),
         containerColor = tokens.obsidianSurface,
+        accentEdgeColor = tokens.hairlineSpecularTop,
         cornerRadius = 22.dp,
         contentPadding = PaddingValues(if (isWideLayout) 22.dp else 18.dp),
     ) {
@@ -587,6 +627,101 @@ private fun PrimaryBatchSyllabusCard(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StudioQuickLaunchTile(
+    title: String,
+    subtitle: String,
+    badge: String,
+    icon: ImageVector,
+    accent: Color,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = GhickinTokens.colors
+    val interaction = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
+
+    Surface(
+        shape = shape,
+        color = tokens.obsidianSurface,
+        border = BorderStroke(1.dp, tokens.hairlineRest),
+        modifier = modifier
+            .testTag(testTag)
+            .minimumInteractiveComponentSize()
+            .tactileScale(interaction, pressedScale = 0.97f)
+            .clip(shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = accent.copy(alpha = 0.16f)),
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tokens.carbonSurface),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = accent,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = tokens.inkPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = tokens.carbonSurface,
+                    ) {
+                        Text(
+                            text = badge,
+                            style = MicroTagMono,
+                            color = accent,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = tokens.inkMuted,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

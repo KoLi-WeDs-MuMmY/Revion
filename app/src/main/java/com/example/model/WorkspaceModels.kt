@@ -6,12 +6,14 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.FolderCopy
 import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,6 +74,18 @@ enum class WorkspaceTab(
             "Morphing sub-views for Class Notes/RAG, Flashcards (Chapter -> Class), and Revision",
         ),
         suggestedMood = AccentMood.CYAN,
+    ),
+    QUIZZES(
+        routeId = "quizzes",
+        label = "Quizzes",
+        shortLabel = "Quizzes",
+        selectedIcon = Icons.Filled.Quiz,
+        unselectedIcon = Icons.Outlined.Quiz,
+        phaseTag = "PHASE 1.6.2",
+        previewTitle = "PW-Style Quiz Arena & Exam Mode",
+        previewSummary = "Batch -> Subject -> Chapter practice drills with Exam Mode (+4/-1, timer, mark-for-review, palette) and Normal instant explanations.",
+        plannedCapabilities = emptyList(),
+        suggestedMood = AccentMood.AMBER,
     ),
     AI_TUTOR(
         routeId = "ai_tutor",
@@ -221,6 +235,8 @@ data class WorkspaceUiState(
     val revisionQuizState: RevisionQuizUiState,
     val flashcardsState: FlashcardsMistakesUiState,
     val tutorPlannerState: TutorPlannerUiState,
+    val grokTutorState: GrokTutorUiState,
+    val pwQuizArenaState: PwQuizArenaUiState,
 ) {
     val primaryBatch: StudyBatch
         get() = batchesState.batches.firstOrNull { it.id == primaryBatchId }

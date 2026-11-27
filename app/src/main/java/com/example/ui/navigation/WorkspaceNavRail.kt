@@ -348,7 +348,7 @@ fun GhickinBottomNavBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+                .padding(horizontal = 3.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -368,13 +368,13 @@ fun GhickinBottomNavBar(
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_bottom_item_${tab.routeId}")
                         .minimumInteractiveComponentSize()
                         .tactileScale(interactionSource, pressedScale = 0.94f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable(
                             interactionSource = interactionSource,
                             indication = ripple(color = accent.copy(alpha = 0.16f)),
@@ -386,16 +386,16 @@ fun GhickinBottomNavBar(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .width(42.dp)
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(9.dp))
+                            .width(36.dp)
+                            .height(26.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(pillColor),
                     ) {
                         Icon(
                             imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
                             contentDescription = tab.label,
                             tint = iconColor,
-                            modifier = Modifier.size(19.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                     Text(

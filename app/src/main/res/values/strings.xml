@@ -276,4 +276,55 @@
     <string name="home_analytics_remaining_format">%1$d remaining in batch</string>
     <string name="home_analytics_all_done_label">All batch lectures finished</string>
     <string name="home_analytics_gate_status_format">%1$d/2 daily gates · %2$d cards in batch</string>
+
+    <!-- Phase 1.6.2: Grok-Style AI Tutor, Image-Code Web Viewer & PW Quizzes Arena -->
+    <string name="nav_quizzes">Quizzes</string>
+    <string name="home_quick_launch_tutor">AI Tutor</string>
+    <string name="home_quick_launch_quizzes">Quiz Arena</string>
+
+    <string name="grok_tutor_title">AI Tutor</string>
+    <string name="grok_tutor_new_chat">New Chat</string>
+    <string name="grok_tutor_sidebar_desc">Toggle chat history sidebar</string>
+    <string name="grok_tutor_menu_desc">Chat chapter options</string>
+    <string name="grok_tutor_welcome_headline">Which chapter are you studying?</string>
+    <string name="grok_tutor_welcome_subtitle">Link one or more chapters to scope your diagram RAG index and start a focused study thread.</string>
+    <string name="grok_tutor_choose_chapters_cta">Choose Chapters</string>
+    <string name="grok_tutor_change_chapters_menu">Edit Linked Chapters</string>
+    <string name="grok_tutor_inspect_rag_menu">View Chapter Diagram Index</string>
+    <string name="grok_tutor_composer_placeholder">Ask a doubt or request a visual diagram…</string>
+    <string name="grok_tutor_composer_choose_first">Tap here to choose chapter(s) first…</string>
+    <string name="grok_tutor_recents_label">RECENTS</string>
+    <string name="grok_tutor_folders_label">BATCH → CHAPTER FOLDERS</string>
+    <string name="grok_tutor_picker_title">Link Study Chapters</string>
+    <string name="grok_tutor_picker_subtitle">Select one or more chapters across your batches. Only diagrams inside these chapters are indexed for this chat.</string>
+    <string name="grok_tutor_picker_confirm">Link Selected Chapters</string>
+    <string name="grok_tutor_rag_index_title">Chapter Diagram RAG Index</string>
+    <string name="grok_tutor_rag_index_subtitle">Filenames exposed via invisible prompt suffix from private app storage (filesDir/diagrams/).</string>
+
+    <string name="webviewer_open_zoom">Open &amp; Zoom</string>
+    <string name="webviewer_split_screen">Split Screen</string>
+    <string name="webviewer_exit_split">Close Split</string>
+    <string name="webviewer_zoom_in_desc">Zoom in diagram</string>
+    <string name="webviewer_zoom_out_desc">Zoom out diagram</string>
+    <string name="webviewer_reset_zoom_desc">Reset diagram zoom</string>
+    <string name="webviewer_close_desc">Close diagram viewer</string>
+    <string name="webviewer_private_badge">PRIVATE DIAGRAM CODE</string>
+
+    <string name="quizzes_arena_title">Quiz Arena</string>
+    <string name="quizzes_arena_subtitle">Batch → Subject → Chapter practice drills with Exam Mode (+4 / −1)</string>
+    <string name="quizzes_recent_attempts">RECENT ATTEMPTS</string>
+    <string name="quizzes_start_cta">Attempt Quiz</string>
+    <string name="quizzes_mode_gate_title">Select Test Mode</string>
+    <string name="quizzes_mode_gate_subtitle">Choose how you want to take this test before question 1 begins.</string>
+    <string name="quizzes_mode_exam_title">Exam Mode (+4 / −1)</string>
+    <string name="quizzes_mode_exam_desc">Live countdown timer, Mark for Review, interactive question palette &amp; negative marking. Answers lock until final submit.</string>
+    <string name="quizzes_mode_normal_title">Normal Practice Mode</string>
+    <string name="quizzes_mode_normal_desc">Untimed active learning with instant answer verification and step-by-step explanations after every question.</string>
+    <string name="quizzes_launch_exam_cta">Begin Exam Mode</string>
+    <string name="quizzes_launch_normal_cta">Begin Normal Mode</string>
+    <string name="quizzes_mark_review">Mark for Review</string>
+    <string name="quizzes_marked_review">Marked</string>
+    <string name="quizzes_palette_desc">Open question palette</string>
+    <string name="quizzes_submit_final">Submit Test</string>
+    <string name="quizzes_ask_tutor_weak">Study in AI Tutor</string>
 </resources>

@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Immutable
@@ -40,6 +42,15 @@ data class GhickinExtendedColors(
     val activeMood: AccentMood,
     val activeTheme: AppThemeId,
     val isLightTheme: Boolean,
+    val chatUserBubble: Color,
+    val chatAssistantSurface: Color,
+    val chatSidebarBg: Color,
+    val chatComposerBg: Color,
+    val chatCodeBg: Color,
+    val chatLogoPrimary: Color,
+    val chatLogoSecondary: Color,
+    val chatComposerRadius: Dp,
+    val chatBubbleRadius: Dp,
 )
 
 val LocalGhickinColors = staticCompositionLocalOf {
@@ -64,6 +75,15 @@ val LocalGhickinColors = staticCompositionLocalOf {
         activeMood = AccentMood.CYAN,
         activeTheme = AppThemeId.GROK_BLACK,
         isLightTheme = false,
+        chatUserBubble = SlateElevated,
+        chatAssistantSurface = ObsidianSurface,
+        chatSidebarBg = ObsidianSurface,
+        chatComposerBg = CarbonSurface,
+        chatCodeBg = CarbonSurface,
+        chatLogoPrimary = GrokWhite,
+        chatLogoSecondary = InkMuted,
+        chatComposerRadius = 24.dp,
+        chatBubbleRadius = 18.dp,
     )
 }
 
@@ -103,6 +123,15 @@ fun GhickinTheme(
     val rawHairlineSpecular = colorResource(appTheme.hairlineSpecularRes)
     val rawError = colorResource(appTheme.errorRes)
     val rawSuccess = if (appTheme.isLight) FeedbackCorrectLight else AccentMood.EMERALD.accent
+    val rawChatUserBubble = colorResource(appTheme.chatUserBubbleRes)
+    val rawChatAssistantSurface = colorResource(appTheme.chatAssistantSurfaceRes)
+    val rawChatSidebarBg = colorResource(appTheme.chatSidebarBgRes)
+    val rawChatComposerBg = colorResource(appTheme.chatComposerBgRes)
+    val rawChatCodeBg = colorResource(appTheme.chatCodeBgRes)
+    val rawChatLogoPrimary = colorResource(appTheme.chatLogoPrimaryRes)
+    val rawChatLogoSecondary = colorResource(appTheme.chatLogoSecondaryRes)
+    val chatComposerRadius = dimensionResource(appTheme.chatComposerRadiusRes)
+    val chatBubbleRadius = dimensionResource(appTheme.chatBubbleRadiusRes)
 
     val bg by animateColorAsState(rawBg, colorSpring, label = "themeBg")
     val surface by animateColorAsState(rawSurface, colorSpring, label = "themeSurface")
@@ -121,6 +150,13 @@ fun GhickinTheme(
     val errorColor by animateColorAsState(rawError, colorSpring, label = "themeError")
     val semanticSuccess by animateColorAsState(rawSuccess, colorSpring, label = "themeSuccess")
     val subtleAccent by animateColorAsState(accentMood.accent, colorSpring, label = "subtleAccent")
+    val chatUserBubble by animateColorAsState(rawChatUserBubble, colorSpring, label = "chatUserBubble")
+    val chatAssistantSurface by animateColorAsState(rawChatAssistantSurface, colorSpring, label = "chatAssistantSurface")
+    val chatSidebarBg by animateColorAsState(rawChatSidebarBg, colorSpring, label = "chatSidebarBg")
+    val chatComposerBg by animateColorAsState(rawChatComposerBg, colorSpring, label = "chatComposerBg")
+    val chatCodeBg by animateColorAsState(rawChatCodeBg, colorSpring, label = "chatCodeBg")
+    val chatLogoPrimary by animateColorAsState(rawChatLogoPrimary, colorSpring, label = "chatLogoPrimary")
+    val chatLogoSecondary by animateColorAsState(rawChatLogoSecondary, colorSpring, label = "chatLogoSecondary")
 
     val colorScheme = if (appTheme.isLight) {
         lightColorScheme(
@@ -211,6 +247,15 @@ fun GhickinTheme(
         activeMood = accentMood,
         activeTheme = appTheme,
         isLightTheme = appTheme.isLight,
+        chatUserBubble = chatUserBubble,
+        chatAssistantSurface = chatAssistantSurface,
+        chatSidebarBg = chatSidebarBg,
+        chatComposerBg = chatComposerBg,
+        chatCodeBg = chatCodeBg,
+        chatLogoPrimary = chatLogoPrimary,
+        chatLogoSecondary = chatLogoSecondary,
+        chatComposerRadius = chatComposerRadius,
+        chatBubbleRadius = chatBubbleRadius,
     )
 
     val typography = remember(appTheme) { typographyForTheme(appTheme) }

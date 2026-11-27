@@ -26,8 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import com.example.model.BatchCrudDialog
+import com.example.model.ChapterDiagramRef
 import com.example.model.DailyPageRoute
+import com.example.model.DiagramAttachment
 import com.example.model.PresetSubjectTemplate
+import com.example.model.TestArenaMode
 import com.example.model.VaultCategorySubView
 import com.example.model.VaultLectureNode
 import com.example.model.VaultPaletteFocus
@@ -38,9 +41,11 @@ import com.example.ui.components.AmbientMineralBackdrop
 import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
 import com.example.ui.settings.SettingsScreen
+import com.example.ui.test.PwTestArenaScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.tutor.GrokAiTutorScreen
 import com.example.ui.vault.PwVaultScreen
 
 @Composable
@@ -109,6 +114,41 @@ fun WorkspaceShell(
     onSelectVaultPaletteCategoryFilter: (VaultCategorySubView?) -> Unit,
     onClearVaultPaletteFilters: () -> Unit,
     onJumpToVaultLectureFromPalette: (VaultLectureNode, VaultCategorySubView) -> Unit,
+    // Phase 1.6.2: Grok AI Tutor & Image-Code Web Viewer callbacks
+    onToggleTutorSidebar: () -> Unit,
+    onCloseTutorSidebar: () -> Unit,
+    onStartNewTutorChat: () -> Unit,
+    onSelectTutorSession: (String) -> Unit,
+    onOpenTutorChapterPicker: () -> Unit,
+    onCloseTutorChapterPicker: () -> Unit,
+    onConfirmTutorLinkedChapters: (batchId: String, chapterIds: List<String>) -> Unit,
+    onOpenTutorRagIndexDialog: () -> Unit,
+    onCloseTutorRagIndexDialog: () -> Unit,
+    onUpdateTutorComposerText: (String) -> Unit,
+    onSendGrokTutorPrompt: (String) -> Unit,
+    onOpenDiagramModal: (DiagramAttachment) -> Unit,
+    onOpenDiagramSplitScreen: (DiagramAttachment) -> Unit,
+    onPreviewCatalogDiagram: (ChapterDiagramRef) -> Unit,
+    onToggleDiagramSplitScreen: () -> Unit,
+    onCloseDiagramViewer: () -> Unit,
+    onZoomDiagram: (Int) -> Unit,
+    onResetDiagramZoom: () -> Unit,
+    // Phase 1.6.2: PW-Style Quizzes Arena callbacks
+    onCycleQuizArenaBatch: () -> Unit,
+    onSelectQuizArenaSubject: (String?) -> Unit,
+    onRequestStartChapterQuiz: (subjectId: String, chapterId: String) -> Unit,
+    onDismissQuizModeGate: () -> Unit,
+    onConfirmStartQuizMode: (TestArenaMode) -> Unit,
+    onSelectQuizArenaOption: (Int) -> Unit,
+    onClearQuizArenaOption: () -> Unit,
+    onToggleQuizMarkForReview: () -> Unit,
+    onJumpToQuizQuestion: (Int) -> Unit,
+    onToggleQuizPalette: () -> Unit,
+    onSubmitQuizArenaSession: () -> Unit,
+    onExitQuizArenaSession: () -> Unit,
+    onRetryMissedQuizQuestions: () -> Unit,
+    onRetakeFullQuiz: () -> Unit,
+    onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -218,6 +258,39 @@ fun WorkspaceShell(
                         onSelectVaultPaletteCategoryFilter = onSelectVaultPaletteCategoryFilter,
                         onClearVaultPaletteFilters = onClearVaultPaletteFilters,
                         onJumpToVaultLectureFromPalette = onJumpToVaultLectureFromPalette,
+                        onToggleTutorSidebar = onToggleTutorSidebar,
+                        onCloseTutorSidebar = onCloseTutorSidebar,
+                        onStartNewTutorChat = onStartNewTutorChat,
+                        onSelectTutorSession = onSelectTutorSession,
+                        onOpenTutorChapterPicker = onOpenTutorChapterPicker,
+                        onCloseTutorChapterPicker = onCloseTutorChapterPicker,
+                        onConfirmTutorLinkedChapters = onConfirmTutorLinkedChapters,
+                        onOpenTutorRagIndexDialog = onOpenTutorRagIndexDialog,
+                        onCloseTutorRagIndexDialog = onCloseTutorRagIndexDialog,
+                        onUpdateTutorComposerText = onUpdateTutorComposerText,
+                        onSendGrokTutorPrompt = onSendGrokTutorPrompt,
+                        onOpenDiagramModal = onOpenDiagramModal,
+                        onOpenDiagramSplitScreen = onOpenDiagramSplitScreen,
+                        onPreviewCatalogDiagram = onPreviewCatalogDiagram,
+                        onToggleDiagramSplitScreen = onToggleDiagramSplitScreen,
+                        onCloseDiagramViewer = onCloseDiagramViewer,
+                        onZoomDiagram = onZoomDiagram,
+                        onResetDiagramZoom = onResetDiagramZoom,
+                        onCycleQuizArenaBatch = onCycleQuizArenaBatch,
+                        onSelectQuizArenaSubject = onSelectQuizArenaSubject,
+                        onRequestStartChapterQuiz = onRequestStartChapterQuiz,
+                        onDismissQuizModeGate = onDismissQuizModeGate,
+                        onConfirmStartQuizMode = onConfirmStartQuizMode,
+                        onSelectQuizArenaOption = onSelectQuizArenaOption,
+                        onClearQuizArenaOption = onClearQuizArenaOption,
+                        onToggleQuizMarkForReview = onToggleQuizMarkForReview,
+                        onJumpToQuizQuestion = onJumpToQuizQuestion,
+                        onToggleQuizPalette = onToggleQuizPalette,
+                        onSubmitQuizArenaSession = onSubmitQuizArenaSession,
+                        onExitQuizArenaSession = onExitQuizArenaSession,
+                        onRetryMissedQuizQuestions = onRetryMissedQuizQuestions,
+                        onRetakeFullQuiz = onRetakeFullQuiz,
+                        onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
                     )
                 }
             }
@@ -292,6 +365,39 @@ fun WorkspaceShell(
                         onSelectVaultPaletteCategoryFilter = onSelectVaultPaletteCategoryFilter,
                         onClearVaultPaletteFilters = onClearVaultPaletteFilters,
                         onJumpToVaultLectureFromPalette = onJumpToVaultLectureFromPalette,
+                        onToggleTutorSidebar = onToggleTutorSidebar,
+                        onCloseTutorSidebar = onCloseTutorSidebar,
+                        onStartNewTutorChat = onStartNewTutorChat,
+                        onSelectTutorSession = onSelectTutorSession,
+                        onOpenTutorChapterPicker = onOpenTutorChapterPicker,
+                        onCloseTutorChapterPicker = onCloseTutorChapterPicker,
+                        onConfirmTutorLinkedChapters = onConfirmTutorLinkedChapters,
+                        onOpenTutorRagIndexDialog = onOpenTutorRagIndexDialog,
+                        onCloseTutorRagIndexDialog = onCloseTutorRagIndexDialog,
+                        onUpdateTutorComposerText = onUpdateTutorComposerText,
+                        onSendGrokTutorPrompt = onSendGrokTutorPrompt,
+                        onOpenDiagramModal = onOpenDiagramModal,
+                        onOpenDiagramSplitScreen = onOpenDiagramSplitScreen,
+                        onPreviewCatalogDiagram = onPreviewCatalogDiagram,
+                        onToggleDiagramSplitScreen = onToggleDiagramSplitScreen,
+                        onCloseDiagramViewer = onCloseDiagramViewer,
+                        onZoomDiagram = onZoomDiagram,
+                        onResetDiagramZoom = onResetDiagramZoom,
+                        onCycleQuizArenaBatch = onCycleQuizArenaBatch,
+                        onSelectQuizArenaSubject = onSelectQuizArenaSubject,
+                        onRequestStartChapterQuiz = onRequestStartChapterQuiz,
+                        onDismissQuizModeGate = onDismissQuizModeGate,
+                        onConfirmStartQuizMode = onConfirmStartQuizMode,
+                        onSelectQuizArenaOption = onSelectQuizArenaOption,
+                        onClearQuizArenaOption = onClearQuizArenaOption,
+                        onToggleQuizMarkForReview = onToggleQuizMarkForReview,
+                        onJumpToQuizQuestion = onJumpToQuizQuestion,
+                        onToggleQuizPalette = onToggleQuizPalette,
+                        onSubmitQuizArenaSession = onSubmitQuizArenaSession,
+                        onExitQuizArenaSession = onExitQuizArenaSession,
+                        onRetryMissedQuizQuestions = onRetryMissedQuizQuestions,
+                        onRetakeFullQuiz = onRetakeFullQuiz,
+                        onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
                     )
                 }
 
@@ -369,6 +475,39 @@ private fun WorkspaceStage(
     onSelectVaultPaletteCategoryFilter: (VaultCategorySubView?) -> Unit,
     onClearVaultPaletteFilters: () -> Unit,
     onJumpToVaultLectureFromPalette: (VaultLectureNode, VaultCategorySubView) -> Unit,
+    onToggleTutorSidebar: () -> Unit,
+    onCloseTutorSidebar: () -> Unit,
+    onStartNewTutorChat: () -> Unit,
+    onSelectTutorSession: (String) -> Unit,
+    onOpenTutorChapterPicker: () -> Unit,
+    onCloseTutorChapterPicker: () -> Unit,
+    onConfirmTutorLinkedChapters: (batchId: String, chapterIds: List<String>) -> Unit,
+    onOpenTutorRagIndexDialog: () -> Unit,
+    onCloseTutorRagIndexDialog: () -> Unit,
+    onUpdateTutorComposerText: (String) -> Unit,
+    onSendGrokTutorPrompt: (String) -> Unit,
+    onOpenDiagramModal: (DiagramAttachment) -> Unit,
+    onOpenDiagramSplitScreen: (DiagramAttachment) -> Unit,
+    onPreviewCatalogDiagram: (ChapterDiagramRef) -> Unit,
+    onToggleDiagramSplitScreen: () -> Unit,
+    onCloseDiagramViewer: () -> Unit,
+    onZoomDiagram: (Int) -> Unit,
+    onResetDiagramZoom: () -> Unit,
+    onCycleQuizArenaBatch: () -> Unit,
+    onSelectQuizArenaSubject: (String?) -> Unit,
+    onRequestStartChapterQuiz: (subjectId: String, chapterId: String) -> Unit,
+    onDismissQuizModeGate: () -> Unit,
+    onConfirmStartQuizMode: (TestArenaMode) -> Unit,
+    onSelectQuizArenaOption: (Int) -> Unit,
+    onClearQuizArenaOption: () -> Unit,
+    onToggleQuizMarkForReview: () -> Unit,
+    onJumpToQuizQuestion: (Int) -> Unit,
+    onToggleQuizPalette: () -> Unit,
+    onSubmitQuizArenaSession: () -> Unit,
+    onExitQuizArenaSession: () -> Unit,
+    onRetryMissedQuizQuestions: () -> Unit,
+    onRetakeFullQuiz: () -> Unit,
+    onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
 ) {
     val spatialSpring = spring<IntOffset>(
         dampingRatio = 0.88f,
@@ -422,6 +561,8 @@ private fun WorkspaceStage(
                 onToggleTodayFlashcardsCompleted = onToggleTodayFlashcardsCompleted,
                 onToggleStudyGateTestOverride = onToggleStudyGateTestOverride,
                 onStartTodaysNewStudy = onStartTodaysNewStudy,
+                onQuickOpenAiTutor = { onSelectTab(WorkspaceTab.AI_TUTOR) },
+                onQuickOpenQuizzes = { onSelectTab(WorkspaceTab.QUIZZES) },
             )
 
             WorkspaceTab.BATCHES -> BatchesScreen(
@@ -476,7 +617,55 @@ private fun WorkspaceStage(
                 onJumpToLectureFromPalette = onJumpToVaultLectureFromPalette,
             )
 
-            WorkspaceTab.AI_TUTOR,
+            WorkspaceTab.QUIZZES -> PwTestArenaScreen(
+                state = uiState.pwQuizArenaState,
+                batches = uiState.batchesState.batches,
+                subjectsByBatch = uiState.pwVaultState.subjectsByBatch,
+                isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
+                onCycleBatch = onCycleQuizArenaBatch,
+                onSelectSubject = onSelectQuizArenaSubject,
+                onRequestStartChapterQuiz = onRequestStartChapterQuiz,
+                onDismissModeGate = onDismissQuizModeGate,
+                onConfirmStartMode = onConfirmStartQuizMode,
+                onSelectOption = onSelectQuizArenaOption,
+                onClearOption = onClearQuizArenaOption,
+                onToggleMarkForReview = onToggleQuizMarkForReview,
+                onJumpToQuestion = onJumpToQuizQuestion,
+                onTogglePalette = onToggleQuizPalette,
+                onSubmitTest = onSubmitQuizArenaSession,
+                onExitSession = onExitQuizArenaSession,
+                onRetryMissed = onRetryMissedQuizQuestions,
+                onRetakeFull = onRetakeFullQuiz,
+                onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
+            )
+
+            WorkspaceTab.AI_TUTOR -> GrokAiTutorScreen(
+                state = uiState.grokTutorState,
+                batches = uiState.batchesState.batches,
+                subjectsByBatch = uiState.pwVaultState.subjectsByBatch,
+                isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
+                onToggleSidebar = onToggleTutorSidebar,
+                onCloseSidebar = onCloseTutorSidebar,
+                onStartNewChat = onStartNewTutorChat,
+                onSelectSession = onSelectTutorSession,
+                onOpenChapterPicker = onOpenTutorChapterPicker,
+                onCloseChapterPicker = onCloseTutorChapterPicker,
+                onConfirmLinkedChapters = onConfirmTutorLinkedChapters,
+                onOpenRagIndexDialog = onOpenTutorRagIndexDialog,
+                onCloseRagIndexDialog = onCloseTutorRagIndexDialog,
+                onUpdateComposerText = onUpdateTutorComposerText,
+                onSendPrompt = onSendGrokTutorPrompt,
+                onOpenDiagramModal = onOpenDiagramModal,
+                onOpenDiagramSplitScreen = onOpenDiagramSplitScreen,
+                onPreviewCatalogDiagram = onPreviewCatalogDiagram,
+                onToggleDiagramSplitScreen = onToggleDiagramSplitScreen,
+                onCloseDiagramViewer = onCloseDiagramViewer,
+                onZoomDiagram = onZoomDiagram,
+                onResetDiagramZoom = onResetDiagramZoom,
+            )
+
             WorkspaceTab.DAILY_PLANNER,
             WorkspaceTab.TIMER_GROUP,
             -> PhasePlaceholderScreen(
