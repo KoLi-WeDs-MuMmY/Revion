@@ -24,12 +24,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,7 +45,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,34 +61,43 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.BatchChapter
 import com.example.model.BatchSubject
+import com.example.model.VaultLectureNode
 import com.example.ui.components.AnimatedLinearProgressBar
-import com.example.ui.components.AnimatedMasteryRing
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.tactileScale
+import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 
 @Composable
 fun BatchSubjectCard(
     subject: BatchSubject,
     expanded: Boolean,
+    expandedChapterId: String?,
     ringDelayMillis: Long,
     onToggleExpand: () -> Unit,
-    onToggleChapter: (String) -> Unit,
+    onToggleChapterExpand: (String) -> Unit,
+    onToggleChapterComplete: (String) -> Unit,
+    onEditSubject: () -> Unit,
+    onDeleteSubject: () -> Unit,
+    onAddChapter: () -> Unit,
+    onEditChapter: (BatchChapter) -> Unit,
+    onDeleteChapter: (BatchChapter) -> Unit,
+    onAddLecture: (BatchChapter) -> Unit,
+    onToggleLectureCompleted: (chapterId: String, lectureId: String) -> Unit,
+    onEditLecture: (BatchChapter, VaultLectureNode) -> Unit,
+    onDeleteLecture: (BatchChapter, VaultLectureNode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = subject.accentMood.accent
+    val dotAccent = subject.accentMood.accent
+    var subjectMenuOpen by remember { mutableStateOf(false) }
 
     val edgeColor by animateColorAsState(
-        targetValue = if (expanded) accent.copy(alpha = 0.52f) else subject.accentMood.hairlineTint,
+        targetValue = if (expanded) tokens.inkPrimary.copy(alpha = 0.22f) else tokens.hairlineRest,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 360f),
         label = "subjectEdge_${subject.id}",
-    )
-    val washColor by animateColorAsState(
-        targetValue = if (expanded) subject.accentMood.surfaceWash else Color.Transparent,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 360f),
-        label = "subjectWash_${subject.id}",
     )
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -90,40 +109,34 @@ fun BatchSubjectCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag("batch_subject_card_${subject.id}")
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = 0.84f,
-                    stiffness = 360f,
-                ),
-            ),
+            .animateContentSize(spring(dampingRatio = 0.84f, stiffness = 360f)),
         containerColor = tokens.obsidianSurface,
         accentEdgeColor = edgeColor,
-        surfaceWashColor = washColor,
-        cornerRadius = 20.dp,
-        contentPadding = PaddingValues(18.dp),
+        cornerRadius = 18.dp,
+        contentPadding = PaddingValues(16.dp),
         onClick = onToggleExpand,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Top subject summary row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Quiet 7dp subject dot indicator
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(accent),
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(dotAccent),
                 )
 
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -131,80 +144,111 @@ fun BatchSubjectCard(
                     ) {
                         Text(
                             text = subject.name,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = tokens.inkPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = subject.accentMood.container,
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.28f)),
+                            shape = RoundedCornerShape(6.dp),
+                            color = tokens.carbonSurface,
+                            border = BorderStroke(1.dp, tokens.hairlineSubtle),
                         ) {
                             Text(
-                                text = "${subject.chapters.size} CH",
-                                style = MonoBadgeStyle,
-                                color = subject.accentMood.onContainer,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                text = "${subject.chapters.size} CH · ${subject.lectureCount} LEC",
+                                style = MicroTagMono,
+                                color = tokens.inkSecondary,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                             )
                         }
                     }
 
-                    Text(
-                        text = "${subject.completedLectures}/${subject.lectureCount} lectures completed · ${subject.chapters.count { it.isCompleted }}/${subject.chapters.size} chapters mastered",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = tokens.inkSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-
-                    AnimatedLinearProgressBar(
-                        progressPercent = subject.masteryPercent,
-                        accentColor = accent,
-                        height = 5.dp,
-                        delayMillis = ringDelayMillis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AnimatedLinearProgressBar(
+                            progressPercent = subject.masteryPercent,
+                            accentColor = dotAccent,
+                            height = 4.dp,
+                            delayMillis = ringDelayMillis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "${subject.masteryPercent}%",
+                            style = MonoBadgeStyle,
+                            color = tokens.inkSecondary,
+                        )
+                    }
                 }
 
-                AnimatedMasteryRing(
-                    percentage = subject.masteryPercent,
-                    accentColor = accent,
-                    ringSize = 62.dp,
-                    strokeWidth = 5.dp,
-                    delayMillis = ringDelayMillis,
-                )
+                // Inline 3-dot menu for Subject CRUD
+                Box {
+                    IconButton(
+                        onClick = { subjectMenuOpen = true },
+                        modifier = Modifier.testTag("subject_menu_${subject.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "Subject options for ${subject.name}",
+                            tint = tokens.inkMuted,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = subjectMenuOpen,
+                        onDismissRequest = { subjectMenuOpen = false },
+                        containerColor = tokens.carbonSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_add_chapter_cta), color = tokens.inkPrimary) },
+                            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                subjectMenuOpen = false
+                                onAddChapter()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_action_edit), color = tokens.inkPrimary) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                subjectMenuOpen = false
+                                onEditSubject()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_action_delete), color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                subjectMenuOpen = false
+                                onDeleteSubject()
+                            },
+                        )
+                    }
+                }
 
                 Icon(
                     imageVector = Icons.Rounded.ExpandMore,
                     contentDescription = if (expanded) "Collapse chapters" else "Expand chapters",
-                    tint = if (expanded) accent else tokens.inkMuted,
+                    tint = if (expanded) tokens.inkPrimary else tokens.inkMuted,
                     modifier = Modifier
-                        .size(22.dp)
+                        .size(20.dp)
                         .rotate(chevronRotation),
                 )
             }
 
-            // Spring-expanded chapter syllabus rows
+            // Expanded chapters + expandable nested custom lectures
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(animationSpec = spring(stiffness = 380f)) +
-                    expandVertically(
-                        animationSpec = spring(
-                            dampingRatio = 0.84f,
-                            stiffness = 360f,
-                        ),
-                    ),
-                exit = fadeOut(animationSpec = spring(stiffness = 420f)) +
-                    shrinkVertically(
-                        animationSpec = spring(
-                            dampingRatio = 0.88f,
-                            stiffness = 420f,
-                        ),
-                    ),
+                enter = fadeIn(spring(stiffness = 380f)) +
+                    expandVertically(spring(dampingRatio = 0.84f, stiffness = 360f)),
+                exit = fadeOut(spring(stiffness = 420f)) +
+                    shrinkVertically(spring(dampingRatio = 0.88f, stiffness = 420f)),
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
                 ) {
                     Box(
                         modifier = Modifier
@@ -212,19 +256,48 @@ fun BatchSubjectCard(
                             .height(1.dp)
                             .background(tokens.hairlineSubtle),
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.batches_chapters_label).uppercase(),
-                        style = MonoBadgeStyle,
-                        color = tokens.inkMuted,
-                    )
 
-                    subject.chapters.forEach { chapter ->
-                        ChapterChecklistRow(
-                            chapter = chapter,
-                            accentColor = accent,
-                            onToggle = { onToggleChapter(chapter.id) },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "${stringResource(R.string.batches_chapters_label).uppercase()} (${subject.chapters.size})",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
                         )
+                        InlineAddActionChip(
+                            label = stringResource(R.string.batches_add_chapter_cta),
+                            testTag = "add_chapter_btn_${subject.id}",
+                            onClick = onAddChapter,
+                        )
+                    }
+
+                    if (subject.chapters.isEmpty()) {
+                        Text(
+                            text = "No chapters yet. Tap Add Chapter to structure lectures.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = tokens.inkMuted,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        )
+                    } else {
+                        subject.chapters.forEachIndexed { chIdx, chapter ->
+                            ChapterWithLecturesBlock(
+                                index = chIdx + 1,
+                                chapter = chapter,
+                                dotAccent = dotAccent,
+                                expanded = chapter.id == expandedChapterId,
+                                onToggleExpand = { onToggleChapterExpand(chapter.id) },
+                                onToggleComplete = { onToggleChapterComplete(chapter.id) },
+                                onEditChapter = { onEditChapter(chapter) },
+                                onDeleteChapter = { onDeleteChapter(chapter) },
+                                onAddLecture = { onAddLecture(chapter) },
+                                onToggleLectureCompleted = { lecId -> onToggleLectureCompleted(chapter.id, lecId) },
+                                onEditLecture = { lec -> onEditLecture(chapter, lec) },
+                                onDeleteLecture = { lec -> onDeleteLecture(chapter, lec) },
+                            )
+                        }
                     }
                 }
             }
@@ -233,17 +306,27 @@ fun BatchSubjectCard(
 }
 
 @Composable
-private fun ChapterChecklistRow(
+private fun ChapterWithLecturesBlock(
+    index: Int,
     chapter: BatchChapter,
-    accentColor: Color,
-    onToggle: () -> Unit,
+    dotAccent: Color,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onToggleComplete: () -> Unit,
+    onEditChapter: () -> Unit,
+    onDeleteChapter: () -> Unit,
+    onAddLecture: () -> Unit,
+    onToggleLectureCompleted: (String) -> Unit,
+    onEditLecture: (VaultLectureNode) -> Unit,
+    onDeleteLecture: (VaultLectureNode) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(13.dp)
+    val shape = RoundedCornerShape(14.dp)
+    var chapterMenuOpen by remember { mutableStateOf(false) }
 
     val rowBorder by animateColorAsState(
-        targetValue = if (chapter.isCompleted) accentColor.copy(alpha = 0.34f) else tokens.hairlineSubtle,
+        targetValue = if (expanded) tokens.inkPrimary.copy(alpha = 0.22f) else tokens.hairlineSubtle,
         animationSpec = spring(stiffness = 420f),
         label = "chapterBorder_${chapter.id}",
     )
@@ -255,67 +338,301 @@ private fun ChapterChecklistRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("chapter_row_${chapter.id}")
-            .minimumInteractiveComponentSize()
-            .tactileScale(interactionSource, pressedScale = 0.985f)
-            .clip(shape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(color = accentColor.copy(alpha = 0.16f)),
-                role = Role.Checkbox,
-                onClick = onToggle,
-            ),
+            .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 380f)),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Chapter header row (tap to expand/collapse lectures)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .minimumInteractiveComponentSize()
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
+                        role = Role.Button,
+                        onClick = onToggleExpand,
+                    )
+                    .padding(start = 10.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(
+                    onClick = onToggleComplete,
+                    modifier = Modifier.testTag("chapter_check_${chapter.id}"),
+                ) {
+                    Icon(
+                        imageVector = if (chapter.isCompleted) {
+                            Icons.Rounded.CheckCircle
+                        } else {
+                            Icons.Rounded.RadioButtonUnchecked
+                        },
+                        contentDescription = if (chapter.isCompleted) "Chapter completed" else "Mark chapter completed",
+                        tint = if (chapter.isCompleted) AccentMood.EMERALD.accent else tokens.inkMuted,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        text = "CH ${index.toString().padStart(2, '0')} · ${chapter.title}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = tokens.inkPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "${chapter.lectures.size} lectures · ${chapter.progressPercent}%",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                        )
+                        AnimatedLinearProgressBar(
+                            progressPercent = chapter.progressPercent,
+                            accentColor = dotAccent,
+                            height = 3.dp,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                // Inline 3-dot menu for Chapter CRUD
+                Box {
+                    IconButton(
+                        onClick = { chapterMenuOpen = true },
+                        modifier = Modifier.testTag("chapter_menu_${chapter.id}"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "Chapter options for ${chapter.title}",
+                            tint = tokens.inkMuted,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = chapterMenuOpen,
+                        onDismissRequest = { chapterMenuOpen = false },
+                        containerColor = tokens.obsidianSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_add_lecture_cta), color = tokens.inkPrimary) },
+                            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                chapterMenuOpen = false
+                                onAddLecture()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_action_edit), color = tokens.inkPrimary) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                chapterMenuOpen = false
+                                onEditChapter()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_action_delete), color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                chapterMenuOpen = false
+                                onDeleteChapter()
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Expanded nested Lectures list with custom Add/Rename/Delete
+            if (expanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(tokens.hairlineSubtle),
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "LECTURES (${chapter.lectures.size})",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                        )
+                        InlineAddActionChip(
+                            label = stringResource(R.string.batches_add_lecture_cta),
+                            testTag = "add_lecture_btn_${chapter.id}",
+                            onClick = onAddLecture,
+                        )
+                    }
+
+                    if (chapter.lectures.isEmpty()) {
+                        Text(
+                            text = "No lectures in this chapter yet. Tap Add Lecture.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = tokens.inkMuted,
+                        )
+                    } else {
+                        chapter.lectures.forEach { lecture ->
+                            LectureManageRow(
+                                lecture = lecture,
+                                onToggleComplete = { onToggleLectureCompleted(lecture.id) },
+                                onEdit = { onEditLecture(lecture) },
+                                onDelete = { onDeleteLecture(lecture) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LectureManageRow(
+    lecture: VaultLectureNode,
+    onToggleComplete: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    var lectureMenuOpen by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(11.dp),
+        color = tokens.obsidianSurface,
+        border = BorderStroke(1.dp, tokens.hairlineSubtle),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("batch_lecture_row_${lecture.id}"),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(start = 8.dp, end = 4.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(
-                imageVector = if (chapter.isCompleted) {
-                    Icons.Rounded.CheckCircle
-                } else {
-                    Icons.Rounded.RadioButtonUnchecked
-                },
-                contentDescription = if (chapter.isCompleted) "Completed" else "In progress",
-                tint = if (chapter.isCompleted) accentColor else tokens.inkMuted,
-                modifier = Modifier.size(20.dp),
-            )
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            IconButton(
+                onClick = onToggleComplete,
+                modifier = Modifier.testTag("batch_lecture_toggle_${lecture.id}"),
             ) {
+                Icon(
+                    imageVector = if (lecture.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                    contentDescription = if (lecture.isCompleted) "Lecture completed" else "Mark lecture completed",
+                    tint = if (lecture.isCompleted) AccentMood.EMERALD.accent else tokens.inkMuted,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = chapter.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = if (chapter.isCompleted) tokens.inkPrimary else tokens.inkSecondary,
+                    text = "${lecture.lectureCode} · ${lecture.title}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = tokens.inkPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Text(
+                    text = "${lecture.durationLabel} · ${lecture.dateLabel}",
+                    style = MicroTagMono,
+                    color = tokens.inkMuted,
+                )
+            }
+
+            Box {
+                IconButton(
+                    onClick = { lectureMenuOpen = true },
+                    modifier = Modifier.testTag("lecture_menu_${lecture.id}"),
                 ) {
-                    Text(
-                        text = "${chapter.lectureCount} lectures · ${chapter.materialCount} files",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = tokens.inkMuted,
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "Lecture options for ${lecture.title}",
+                        tint = tokens.inkMuted,
+                        modifier = Modifier.size(17.dp),
                     )
-                    AnimatedLinearProgressBar(
-                        progressPercent = chapter.progressPercent,
-                        accentColor = accentColor,
-                        height = 4.dp,
-                        modifier = Modifier.weight(1f),
+                }
+                DropdownMenu(
+                    expanded = lectureMenuOpen,
+                    onDismissRequest = { lectureMenuOpen = false },
+                    containerColor = tokens.carbonSurface,
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.batches_action_edit), color = tokens.inkPrimary) },
+                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(17.dp)) },
+                        onClick = {
+                            lectureMenuOpen = false
+                            onEdit()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.batches_action_delete), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(17.dp)) },
+                        onClick = {
+                            lectureMenuOpen = false
+                            onDelete()
+                        },
                     )
                 }
             }
+        }
+    }
+}
 
+@Composable
+fun InlineAddActionChip(
+    label: String,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = GhickinTokens.colors
+    val interaction = remember { MutableInteractionSource() }
+    Surface(
+        shape = RoundedCornerShape(9.dp),
+        color = tokens.slateElevated,
+        border = BorderStroke(1.dp, tokens.hairlineRest),
+        modifier = modifier
+            .testTag(testTag)
+            .tactileScale(interaction, 0.95f)
+            .clip(RoundedCornerShape(9.dp))
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = null,
+                tint = tokens.inkPrimary,
+                modifier = Modifier.size(14.dp),
+            )
             Text(
-                text = "${chapter.progressPercent}%",
-                style = MonoBadgeStyle,
-                color = if (chapter.isCompleted) accentColor else tokens.inkSecondary,
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = tokens.inkPrimary,
             )
         }
     }

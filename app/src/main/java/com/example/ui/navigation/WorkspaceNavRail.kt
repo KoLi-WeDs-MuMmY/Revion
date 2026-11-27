@@ -49,6 +49,8 @@ import com.example.ui.components.tactileScale
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MonoBadgeStyle
 
+import com.example.ui.theme.rememberScreenLayoutMetrics
+
 @Composable
 fun GhickinNavRail(
     activeTab: WorkspaceTab,
@@ -56,12 +58,13 @@ fun GhickinNavRail(
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
 
     Row(
         modifier = modifier
             .fillMaxHeight()
-            .width(92.dp)
-            .background(tokens.obsidianSurface)
+            .width(metrics.navRailWidth)
+            .background(tokens.amoledBackground)
             .testTag("workspace_nav_rail"),
     ) {
         Column(
@@ -225,7 +228,7 @@ fun GhickinBottomNavBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(tokens.obsidianSurface)
+            .background(tokens.amoledBackground)
             .navigationBarsPadding()
             .testTag("workspace_bottom_bar"),
     ) {

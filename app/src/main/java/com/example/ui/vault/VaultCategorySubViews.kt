@@ -1,14 +1,14 @@
 package com.example.ui.vault
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -39,11 +39,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Flip
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material3.Icon
@@ -69,9 +72,11 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.DailyFlashcardItem
 import com.example.model.PwVaultUiState
+import com.example.model.VaultCategorySubView
 import com.example.model.VaultChapterNode
 import com.example.model.VaultLectureNode
 import com.example.model.VaultSubjectNode
+import com.example.ui.components.AnimatedLinearProgressBar
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
@@ -81,61 +86,504 @@ import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.HumanistReadingBody
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
+import com.example.ui.theme.rememberScreenLayoutMetrics
+
+private enum class CategoryDrillDepth {
+    SUBJECTS,
+    CHAPTERS,
+    LECTURES,
+}
 
 /**
- * SUB-VIEW 1: Class Notes & RAG Metadata
- * Clean expandable lecture note cards with crisp, low-key monochrome/graphite RAG metadata tags.
+ * Shared Horizontal Recents Rail shown inside Class Notes, Flashcards, and Revision modes.
+ * Strictly renders recent items for the active category only.
+ */
+@Composable
+private fun VaultRecentsStrip(
+    heading: String,
+    lectures: List<VaultLectureNode>,
+    mode: VaultCategorySubView,
+    onSelectRecent: (VaultLectureNode) -> Unit,
+) {
+    if (lectures.isEmpty()) return
+    val tokens = GhickinTokens.colors
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("vault_recents_${mode.name.lowercase()}"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.History,
+                contentDescription = null,
+                tint = tokens.inkMuted,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = heading.uppercase(),
+                style = MicroTagMono,
+                color = tokens.inkMuted,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            lectures.forEach { lecture ->
+                val interaction = remember { MutableInteractionSource() }
+                val primaryLine = when (mode) {
+                    VaultCategorySubView.CLASS_NOTES -> lecture.notesTitle
+                    VaultCategorySubView.FLASHCARDS -> lecture.classLabel
+                    VaultCategorySubView.REVISION -> lecture.title
+                    VaultCategorySubView.HIERARCHY_BROWSE -> lecture.title
+                }
+                val metaLine = when (mode) {
+                    VaultCategorySubView.CLASS_NOTES -> "${lecture.notesPageCount}p · RAG"
+                    VaultCategorySubView.FLASHCARDS -> "${lecture.flashcardDeck.size} cards"
+                    VaultCategorySubView.REVISION -> "${lecture.lectureCode} · Digest"
+                    VaultCategorySubView.HIERARCHY_BROWSE -> lecture.durationLabel
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = tokens.obsidianSurface,
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
+                    modifier = Modifier
+                        .width(236.dp)
+                        .testTag("vault_recent_${mode.name.lowercase()}_${lecture.id}")
+                        .tactileScale(interaction, 0.97f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
+                            role = Role.Button,
+                            onClick = { onSelectRecent(lecture) },
+                        ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 11.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(lecture.subjectMood.accent),
+                                )
+                                Text(
+                                    text = lecture.subjectName.uppercase(),
+                                    style = MicroTagMono,
+                                    color = tokens.inkMuted,
+                                    maxLines = 1,
+                                )
+                            }
+                            Text(
+                                text = metaLine,
+                                style = MicroTagMono,
+                                color = tokens.inkSecondary,
+                            )
+                        }
+                        Text(
+                            text = primaryLine,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = tokens.inkPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = lecture.chapterTitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tokens.inkMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Shared Subject -> Chapter drill-down grid used by Class Notes, Flashcards, and Revision
+ * so every mode mirrors Browse's PW-style hierarchy while surfacing ONLY its own artifact counts.
+ */
+@Composable
+private fun CategorySubjectHierarchyGrid(
+    subjects: List<VaultSubjectNode>,
+    mode: VaultCategorySubView,
+    recentsHeading: String,
+    recentLectures: List<VaultLectureNode>,
+    onSelectRecent: (VaultLectureNode) -> Unit,
+    onSelectSubject: (String) -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
+    val columns = metrics.vaultSubjectColumns.coerceAtLeast(1)
+
+    val modeIcon = when (mode) {
+        VaultCategorySubView.CLASS_NOTES -> Icons.Rounded.Description
+        VaultCategorySubView.FLASHCARDS -> Icons.Rounded.Style
+        VaultCategorySubView.REVISION -> Icons.Rounded.AutoStories
+        VaultCategorySubView.HIERARCHY_BROWSE -> Icons.Rounded.Description
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("vault_${mode.name.lowercase()}_subjects"),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
+    ) {
+        if (recentLectures.isNotEmpty()) {
+            item(key = "recents_${mode.name}") {
+                VaultRecentsStrip(
+                    heading = recentsHeading,
+                    lectures = recentLectures,
+                    mode = mode,
+                    onSelectRecent = onSelectRecent,
+                )
+            }
+        }
+
+        item(key = "subjects_heading_${mode.name}") {
+            Text(
+                text = "BROWSE ${mode.label.uppercase()} BY SUBJECT",
+                style = MicroTagMono,
+                color = tokens.inkMuted,
+            )
+        }
+
+        val rows = subjects.chunked(columns)
+        itemsIndexed(rows) { rIdx, rowSubjects ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                rowSubjects.forEachIndexed { cIdx, subject ->
+                    val artifactSummary = when (mode) {
+                        VaultCategorySubView.CLASS_NOTES -> "${subject.totalLectures} Notes PDFs · ${subject.chapters.size} Chapters"
+                        VaultCategorySubView.FLASHCARDS -> {
+                            val totalCards = subject.chapters.sumOf { it.totalFlashcards }
+                            "$totalCards Flashcards · ${subject.chapters.size} Chapters"
+                        }
+                        VaultCategorySubView.REVISION -> "${subject.totalLectures} Revision Sheets · ${subject.chapters.size} Chapters"
+                        VaultCategorySubView.HIERARCHY_BROWSE -> "${subject.totalLectures} Lectures"
+                    }
+
+                    StaggeredEntrance(
+                        delayMillis = 35L * (rIdx * columns + cIdx),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        ObsidianCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("vault_${mode.name.lowercase()}_subj_${subject.id}"),
+                            containerColor = tokens.obsidianSurface,
+                            cornerRadius = 18.dp,
+                            contentPadding = PaddingValues(16.dp),
+                            onClick = { onSelectSubject(subject.id) },
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(RoundedCornerShape(11.dp))
+                                            .background(tokens.carbonSurface),
+                                    ) {
+                                        Icon(
+                                            imageVector = modeIcon,
+                                            contentDescription = null,
+                                            tint = tokens.inkPrimary,
+                                            modifier = Modifier.size(19.dp),
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(subject.accentMood.accent),
+                                    )
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(
+                                        text = subject.name,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = tokens.inkPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = artifactSummary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = tokens.inkSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = "OPEN ${mode.label.uppercase()}",
+                                        style = MicroTagMono,
+                                        color = tokens.inkMuted,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Rounded.ChevronRight,
+                                        contentDescription = "Open ${subject.name}",
+                                        tint = tokens.inkMuted,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                repeat(columns - rowSubjects.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChapterHierarchyGrid(
+    subject: VaultSubjectNode,
+    mode: VaultCategorySubView,
+    onSelectChapter: (String) -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
+    val columns = metrics.vaultChapterColumns.coerceAtLeast(1)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("vault_${mode.name.lowercase()}_chapters"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
+    ) {
+        item(key = "cat_chapters_heading") {
+            Text(
+                text = "${subject.name.uppercase()} · SELECT CHAPTER FOR ${mode.label.uppercase()}",
+                style = MicroTagMono,
+                color = tokens.inkMuted,
+            )
+        }
+
+        val rows = subject.chapters.chunked(columns)
+        itemsIndexed(rows) { rIdx, rowChapters ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                rowChapters.forEachIndexed { cIdx, chapter ->
+                    val indexNum = rIdx * columns + cIdx + 1
+                    val countTag = when (mode) {
+                        VaultCategorySubView.CLASS_NOTES -> "${chapter.lectures.size} PDF Notes"
+                        VaultCategorySubView.FLASHCARDS -> "${chapter.totalFlashcards} Cards · ${chapter.lectures.size} Classes"
+                        VaultCategorySubView.REVISION -> "${chapter.lectures.size} Lecture Digests"
+                        VaultCategorySubView.HIERARCHY_BROWSE -> "${chapter.lectures.size} Lectures"
+                    }
+                    val pct = if (chapter.lectures.isEmpty()) 0 else (chapter.completedLectures * 100) / chapter.lectures.size
+
+                    StaggeredEntrance(
+                        delayMillis = 35L * (rIdx * columns + cIdx),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        ObsidianCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("vault_${mode.name.lowercase()}_ch_${chapter.id}"),
+                            containerColor = tokens.obsidianSurface,
+                            cornerRadius = 18.dp,
+                            contentPadding = PaddingValues(16.dp),
+                            onClick = { onSelectChapter(chapter.id) },
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = tokens.carbonSurface,
+                                            border = BorderStroke(1.dp, tokens.hairlineRest),
+                                        ) {
+                                            Text(
+                                                text = indexNum.toString().padStart(2, '0'),
+                                                style = MonoBadgeStyle,
+                                                color = tokens.inkPrimary,
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(chapter.subjectMood.accent),
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Rounded.ChevronRight,
+                                        contentDescription = "Open chapter",
+                                        tint = tokens.inkMuted,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = chapter.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = tokens.inkPrimary,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = countTag,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = tokens.inkSecondary,
+                                    )
+                                }
+
+                                AnimatedLinearProgressBar(
+                                    progressPercent = pct,
+                                    accentColor = chapter.subjectMood.accent,
+                                    height = 3.dp,
+                                )
+                            }
+                        }
+                    }
+                }
+                repeat(columns - rowChapters.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * SUB-VIEW 1: Class Notes — Recents + Subject -> Chapter -> Lecture Notes PDFs ONLY
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VaultClassNotesSubView(
     state: PwVaultUiState,
+    onSelectSubject: (String) -> Unit,
+    onSelectChapter: (String) -> Unit,
+    onOpenRecentLecture: (VaultLectureNode) -> Unit,
     onToggleExpandNote: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val lectures = remember(state.selectedBatchId, state.selectedSubjectId, state.selectedChapterId, state.subjectsByBatch) {
-        when {
-            state.selectedChapter != null -> state.selectedChapter!!.lectures
-            state.selectedSubject != null -> state.selectedSubject!!.chapters.flatMap { it.lectures }
-            else -> state.allLecturesInBatch
-        }
+    val depth = when {
+        state.selectedChapter != null -> CategoryDrillDepth.LECTURES
+        state.selectedSubject != null -> CategoryDrillDepth.CHAPTERS
+        else -> CategoryDrillDepth.SUBJECTS
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("vault_subview_class_notes_list"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 20.dp),
-    ) {
-        item(key = "notes_section_meta") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = "LECTURE NOTES ARCHIVE · ${lectures.size} DOCUMENTS",
-                    style = MicroTagMono,
-                    color = tokens.inkMuted,
-                )
-                Text(
-                    text = "Tap any note to inspect summary & RAG index",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.inkSecondary,
-                )
-            }
-        }
+    AnimatedContent(
+        targetState = Triple(depth, state.selectedSubject?.id, state.selectedChapter?.id),
+        transitionSpec = {
+            val deeper = targetState.first.ordinal >= initialState.first.ordinal
+            val dir = if (deeper) 1 else -1
+            (fadeIn(tween(200)) + slideInHorizontally(spring(0.86f, 400f)) { dir * (it / 16) }) togetherWith
+                (fadeOut(tween(140)) + slideOutHorizontally(spring(0.86f, 400f)) { -dir * (it / 20) })
+        },
+        label = "vaultClassNotesDepth",
+        modifier = modifier.fillMaxSize(),
+    ) { (activeDepth, _, _) ->
+        when (activeDepth) {
+            CategoryDrillDepth.SUBJECTS -> CategorySubjectHierarchyGrid(
+                subjects = state.subjectsForSelectedBatch,
+                mode = VaultCategorySubView.CLASS_NOTES,
+                recentsHeading = stringResource(R.string.vault_recents_notes_label),
+                recentLectures = state.recentNotesLectures,
+                onSelectRecent = onOpenRecentLecture,
+                onSelectSubject = onSelectSubject,
+            )
 
-        itemsIndexed(items = lectures, key = { _, lec -> lec.id }) { index, lecture ->
-            val expanded = state.expandedClassNoteLectureId == lecture.id
-            StaggeredEntrance(delayMillis = 35L * index) {
-                ClassNoteLectureCard(
-                    lecture = lecture,
-                    expanded = expanded,
-                    onClick = { onToggleExpandNote(lecture.id) },
-                )
+            CategoryDrillDepth.CHAPTERS -> CategoryChapterHierarchyGrid(
+                subject = state.selectedSubject ?: return@AnimatedContent,
+                mode = VaultCategorySubView.CLASS_NOTES,
+                onSelectChapter = onSelectChapter,
+            )
+
+            CategoryDrillDepth.LECTURES -> {
+                val chapter = state.selectedChapter ?: return@AnimatedContent
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("vault_subview_class_notes_list"),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp),
+                ) {
+                    item(key = "notes_chapter_header") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "${chapter.chapterCode} · CLASS NOTES ONLY (${chapter.lectures.size} PDFs)",
+                                style = MicroTagMono,
+                                color = tokens.inkMuted,
+                            )
+                            Text(
+                                text = "Tap to expand summary & RAG tags",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.inkSecondary,
+                            )
+                        }
+                    }
+
+                    itemsIndexed(items = chapter.lectures, key = { _, lec -> lec.id }) { index, lecture ->
+                        val expanded = state.expandedClassNoteLectureId == lecture.id
+                        StaggeredEntrance(delayMillis = 35L * index) {
+                            ClassNoteLectureCard(
+                                lecture = lecture,
+                                expanded = expanded,
+                                onClick = { onToggleExpandNote(lecture.id) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -157,7 +605,7 @@ private fun ClassNoteLectureCard(
         color = tokens.obsidianSurface,
         border = BorderStroke(
             1.dp,
-            if (expanded) tokens.hairlineSpecularTop.copy(alpha = 0.24f) else tokens.hairlineRest,
+            if (expanded) tokens.inkPrimary.copy(alpha = 0.24f) else tokens.hairlineRest,
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -167,7 +615,7 @@ private fun ClassNoteLectureCard(
             .clip(RoundedCornerShape(18.dp))
             .clickable(
                 interactionSource = interaction,
-                indication = ripple(color = subjectColor.copy(alpha = 0.12f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
                 role = Role.Button,
                 onClick = onClick,
             ),
@@ -193,8 +641,8 @@ private fun ClassNoteLectureCard(
                     Icon(
                         imageVector = Icons.Rounded.Description,
                         contentDescription = null,
-                        tint = subjectColor,
-                        modifier = Modifier.size(20.dp),
+                        tint = tokens.inkPrimary,
+                        modifier = Modifier.size(19.dp),
                     )
                 }
 
@@ -202,13 +650,24 @@ private fun ClassNoteLectureCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Text(
-                        text = "${lecture.subjectName.uppercase()} · ${lecture.chapterTitle} · ${lecture.lectureCode}",
-                        style = MicroTagMono,
-                        color = tokens.inkMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(subjectColor),
+                        )
+                        Text(
+                            text = "${lecture.lectureCode} · ${lecture.title}",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Text(
                         text = lecture.notesTitle,
                         style = MaterialTheme.typography.titleMedium,
@@ -231,7 +690,7 @@ private fun ClassNoteLectureCard(
                 )
             }
 
-            // Crisp, low-key monochrome/graphite RAG metadata tags (NOT bright neon badges)
+            // Crisp, low-key monochrome RAG metadata tags
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -280,7 +739,7 @@ private fun ClassNoteLectureCard(
                                     .padding(top = 7.dp)
                                     .size(5.dp)
                                     .clip(CircleShape)
-                                    .background(subjectColor.copy(alpha = 0.75f)),
+                                    .background(subjectColor),
                             )
                             Text(
                                 text = bullet,
@@ -327,119 +786,142 @@ private fun LowKeyMetadataTag(
 }
 
 /**
- * SUB-VIEW 2: Flashcards — Strictly Grouped Chapter -> Class
- * Distinct 2-level collapsible Chapter accordions expanding into Class rows + inline 3D flip preview.
+ * SUB-VIEW 2: Flashcards — Recents + Subject -> Chapter -> Class/Lecture Decks ONLY + 3D Flip Preview
  */
 @Composable
 fun VaultFlashcardsSubView(
     state: PwVaultUiState,
     isWideLayout: Boolean,
-    onToggleChapter: (String) -> Unit,
+    onSelectSubject: (String) -> Unit,
+    onSelectChapter: (String) -> Unit,
+    onOpenRecentLecture: (VaultLectureNode) -> Unit,
     onSelectPreviewCard: (String) -> Unit,
     onFlipPreviewCard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val chapters = remember(state.selectedBatchId, state.selectedSubjectId, state.subjectsByBatch) {
-        if (state.selectedSubject != null) {
-            state.selectedSubject!!.chapters
-        } else {
-            state.allChaptersInBatch
-        }
+    val depth = when {
+        state.selectedChapter != null -> CategoryDrillDepth.LECTURES
+        state.selectedSubject != null -> CategoryDrillDepth.CHAPTERS
+        else -> CategoryDrillDepth.SUBJECTS
     }
-    val allCards = remember(chapters) {
-        chapters.flatMap { ch -> ch.lectures.flatMap { it.flashcardDeck } }
-    }
-    val activePreviewCard = allCards.firstOrNull { it.id == state.previewFlashcardId }
-        ?: allCards.firstOrNull()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("vault_subview_flashcards_tree"),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.vault_flashcards_grouping_hint).uppercase(),
-                style = MicroTagMono,
-                color = tokens.inkMuted,
+    AnimatedContent(
+        targetState = Triple(depth, state.selectedSubject?.id, state.selectedChapter?.id),
+        transitionSpec = {
+            val deeper = targetState.first.ordinal >= initialState.first.ordinal
+            val dir = if (deeper) 1 else -1
+            (fadeIn(tween(200)) + slideInHorizontally(spring(0.86f, 400f)) { dir * (it / 16) }) togetherWith
+                (fadeOut(tween(140)) + slideOutHorizontally(spring(0.86f, 400f)) { -dir * (it / 20) })
+        },
+        label = "vaultFlashcardsDepth",
+        modifier = modifier.fillMaxSize(),
+    ) { (activeDepth, _, _) ->
+        when (activeDepth) {
+            CategoryDrillDepth.SUBJECTS -> CategorySubjectHierarchyGrid(
+                subjects = state.subjectsForSelectedBatch,
+                mode = VaultCategorySubView.FLASHCARDS,
+                recentsHeading = stringResource(R.string.vault_recents_flashcards_label),
+                recentLectures = state.recentFlashcardLectures,
+                onSelectRecent = onOpenRecentLecture,
+                onSelectSubject = onSelectSubject,
             )
-            Text(
-                text = "${chapters.size} Chapters · ${allCards.size} Cards",
-                style = MonoBadgeStyle,
-                color = tokens.inkSecondary,
+
+            CategoryDrillDepth.CHAPTERS -> CategoryChapterHierarchyGrid(
+                subject = state.selectedSubject ?: return@AnimatedContent,
+                mode = VaultCategorySubView.FLASHCARDS,
+                onSelectChapter = onSelectChapter,
             )
-        }
 
-        if (isWideLayout) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                // Left (~54%): Chapter -> Class 2-level Accordion Tree
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(0.54f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp),
-                ) {
-                    items(items = chapters, key = { it.id }) { chapter ->
-                        FlashcardChapterAccordion(
-                            chapter = chapter,
-                            expanded = state.expandedFlashcardChapterId == chapter.id,
-                            activeCardId = activePreviewCard?.id,
-                            onToggleChapter = { onToggleChapter(chapter.id) },
-                            onSelectCard = onSelectPreviewCard,
-                        )
-                    }
-                }
+            CategoryDrillDepth.LECTURES -> {
+                val chapter = state.selectedChapter ?: return@AnimatedContent
+                val allCards = remember(chapter) { chapter.lectures.flatMap { it.flashcardDeck } }
+                val activePreviewCard = allCards.firstOrNull { it.id == state.previewFlashcardId }
+                    ?: allCards.firstOrNull()
 
-                // Right (~46%): Inline 3D Tactile Flip Preview Card
-                Box(
+                Column(
                     modifier = Modifier
-                        .weight(0.46f)
-                        .fillMaxHeight(),
+                        .fillMaxSize()
+                        .testTag("vault_subview_flashcards_tree"),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    if (activePreviewCard != null) {
-                        InlineVaultFlashcardPreview(
-                            card = activePreviewCard,
-                            isFlipped = state.isPreviewCardFlipped,
-                            onFlip = onFlipPreviewCard,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "${chapter.chapterCode} · FLASHCARDS BY CLASS (${allCards.size} CARDS)",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                        )
+                        Text(
+                            text = "${chapter.lectures.size} Classes",
+                            style = MonoBadgeStyle,
+                            color = tokens.inkSecondary,
                         )
                     }
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp),
-            ) {
-                if (activePreviewCard != null) {
-                    item(key = "mobile_flashcard_preview") {
-                        InlineVaultFlashcardPreview(
-                            card = activePreviewCard,
-                            isFlipped = state.isPreviewCardFlipped,
-                            onFlip = onFlipPreviewCard,
-                        )
+
+                    if (isWideLayout) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .weight(0.52f)
+                                    .fillMaxHeight(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                contentPadding = PaddingValues(bottom = 16.dp),
+                            ) {
+                                items(items = chapter.lectures, key = { it.id }) { lecture ->
+                                    FlashcardClassDeckTile(
+                                        lecture = lecture,
+                                        activeCardId = activePreviewCard?.id,
+                                        onSelectCard = onSelectPreviewCard,
+                                    )
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(0.48f)
+                                    .fillMaxHeight(),
+                            ) {
+                                if (activePreviewCard != null) {
+                                    InlineVaultFlashcardPreview(
+                                        card = activePreviewCard,
+                                        isFlipped = state.isPreviewCardFlipped,
+                                        onFlip = onFlipPreviewCard,
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp),
+                        ) {
+                            if (activePreviewCard != null) {
+                                item(key = "mobile_flashcard_preview") {
+                                    InlineVaultFlashcardPreview(
+                                        card = activePreviewCard,
+                                        isFlipped = state.isPreviewCardFlipped,
+                                        onFlip = onFlipPreviewCard,
+                                    )
+                                }
+                            }
+                            items(items = chapter.lectures, key = { it.id }) { lecture ->
+                                FlashcardClassDeckTile(
+                                    lecture = lecture,
+                                    activeCardId = activePreviewCard?.id,
+                                    onSelectCard = onSelectPreviewCard,
+                                )
+                            }
+                        }
                     }
-                }
-                items(items = chapters, key = { it.id }) { chapter ->
-                    FlashcardChapterAccordion(
-                        chapter = chapter,
-                        expanded = state.expandedFlashcardChapterId == chapter.id,
-                        activeCardId = activePreviewCard?.id,
-                        onToggleChapter = { onToggleChapter(chapter.id) },
-                        onSelectCard = onSelectPreviewCard,
-                    )
                 }
             }
         }
@@ -447,181 +929,95 @@ fun VaultFlashcardsSubView(
 }
 
 @Composable
-private fun FlashcardChapterAccordion(
-    chapter: VaultChapterNode,
-    expanded: Boolean,
+private fun FlashcardClassDeckTile(
+    lecture: VaultLectureNode,
     activeCardId: String?,
-    onToggleChapter: () -> Unit,
     onSelectCard: (String) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = chapter.subjectMood.accent
-    val headerInteraction = remember { MutableInteractionSource() }
+    val isClassSelected = lecture.flashcardDeck.any { it.id == activeCardId }
+    val interaction = remember { MutableInteractionSource() }
 
     Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = tokens.obsidianSurface,
+        shape = RoundedCornerShape(16.dp),
+        color = if (isClassSelected) tokens.slateElevated else tokens.obsidianSurface,
         border = BorderStroke(
             1.dp,
-            if (expanded) accent.copy(alpha = 0.36f) else tokens.hairlineRest,
+            if (isClassSelected) tokens.inkPrimary.copy(alpha = 0.24f) else tokens.hairlineRest,
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("vault_fc_chapter_${chapter.id}")
-            .animateContentSize(spring(dampingRatio = 0.84f, stiffness = 380f)),
+            .testTag("vault_fc_class_${lecture.id}")
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
+                role = Role.Button,
+                onClick = { lecture.flashcardDeck.firstOrNull()?.let { onSelectCard(it.id) } },
+            ),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Level 1: Chapter Header
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .minimumInteractiveComponentSize()
-                    .clickable(
-                        interactionSource = headerInteraction,
-                        indication = ripple(color = accent.copy(alpha = 0.14f)),
-                        role = Role.Button,
-                        onClick = onToggleChapter,
-                    )
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(accent),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${chapter.chapterCode} · ${chapter.subjectName.uppercase()}",
-                        style = MicroTagMono,
-                        color = tokens.inkMuted,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(lecture.subjectMood.accent),
                     )
                     Text(
-                        text = chapter.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = lecture.classLabel,
+                        style = MaterialTheme.typography.titleSmall,
                         color = tokens.inkPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = tokens.carbonSurface,
-                    border = BorderStroke(1.dp, tokens.hairlineSubtle),
-                ) {
+                if (lecture.isAutoSavedFromYesterday) {
                     Text(
-                        text = "${chapter.totalFlashcards} cards",
+                        text = "AUTO-SAVED",
                         style = MicroTagMono,
-                        color = tokens.inkSecondary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = AccentMood.EMERALD.accent,
                     )
                 }
-                Icon(
-                    imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                    contentDescription = if (expanded) "Collapse chapter" else "Expand chapter",
-                    tint = tokens.inkSecondary,
-                    modifier = Modifier.size(20.dp),
-                )
             }
 
-            // Level 2: Class / Lecture Rows nested inside this Chapter
-            if (expanded) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    chapter.lectures.forEach { lecture ->
-                        val isClassSelected = lecture.flashcardDeck.any { it.id == activeCardId }
-                        val classInteraction = remember { MutableInteractionSource() }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isClassSelected) tokens.slateElevated else tokens.carbonSurface,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isClassSelected) accent.copy(alpha = 0.42f) else tokens.hairlineSubtle,
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("vault_fc_class_${lecture.id}")
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(
-                                    interactionSource = classInteraction,
-                                    indication = ripple(color = accent.copy(alpha = 0.14f)),
-                                    role = Role.Button,
-                                    onClick = {
-                                        lecture.flashcardDeck.firstOrNull()?.let { onSelectCard(it.id) }
-                                    },
-                                ),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Style,
-                                            contentDescription = null,
-                                            tint = if (isClassSelected) accent else tokens.inkMuted,
-                                            modifier = Modifier.size(15.dp),
-                                        )
-                                        Text(
-                                            text = lecture.classLabel,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = tokens.inkPrimary,
-                                        )
-                                    }
-                                    if (lecture.isAutoSavedFromYesterday) {
-                                        Text(
-                                            text = "AUTO-SAVED",
-                                            style = MicroTagMono,
-                                            color = AccentMood.EMERALD.accent,
-                                        )
-                                    }
-                                }
-
-                                // Individual card pills inside this Class
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    lecture.flashcardDeck.forEachIndexed { idx, card ->
-                                        val selectedCard = card.id == activeCardId
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (selectedCard) accent.copy(alpha = 0.16f) else tokens.obsidianSurface,
-                                            border = BorderStroke(
-                                                1.dp,
-                                                if (selectedCard) accent.copy(alpha = 0.45f) else tokens.hairlineSubtle,
-                                            ),
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable { onSelectCard(card.id) },
-                                        ) {
-                                            Text(
-                                                text = "Card 0${idx + 1}",
-                                                style = MicroTagMono,
-                                                color = if (selectedCard) accent else tokens.inkSecondary,
-                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                lecture.flashcardDeck.forEachIndexed { idx, card ->
+                    val selectedCard = card.id == activeCardId
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selectedCard) tokens.primaryCta else tokens.carbonSurface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (selectedCard) tokens.primaryCta else tokens.hairlineSubtle,
+                        ),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSelectCard(card.id) },
+                    ) {
+                        Text(
+                            text = "Card 0${idx + 1}",
+                            style = MicroTagMono,
+                            color = if (selectedCard) tokens.onPrimaryCta else tokens.inkSecondary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        )
                     }
                 }
             }
@@ -648,9 +1044,12 @@ private fun InlineVaultFlashcardPreview(
     val showingBack = rotationY > 90f
 
     Surface(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         color = if (showingBack) tokens.carbonSurface else tokens.obsidianSurface,
-        border = BorderStroke(1.dp, if (showingBack) accent.copy(alpha = 0.44f) else tokens.hairlineRest),
+        border = BorderStroke(
+            1.dp,
+            if (showingBack) tokens.inkPrimary.copy(alpha = 0.28f) else tokens.hairlineRest,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 250.dp)
@@ -660,10 +1059,10 @@ private fun InlineVaultFlashcardPreview(
                 this.rotationY = rotationY
                 cameraDistance = 14f * density
             }
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = interaction,
-                indication = ripple(color = accent.copy(alpha = 0.14f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
                 role = Role.Button,
                 onClick = onFlip,
             ),
@@ -682,14 +1081,25 @@ private fun InlineVaultFlashcardPreview(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = "${card.chapterTitle.uppercase()} · ${card.classLabel}",
-                        style = MicroTagMono,
-                        color = tokens.inkMuted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
                         modifier = Modifier.weight(1f),
-                    )
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(accent),
+                        )
+                        Text(
+                            text = card.classLabel.uppercase(),
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Spacer(modifier = Modifier.width(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -698,13 +1108,13 @@ private fun InlineVaultFlashcardPreview(
                         Icon(
                             imageVector = Icons.Rounded.Flip,
                             contentDescription = null,
-                            tint = accent,
+                            tint = tokens.inkSecondary,
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
                             text = if (showingBack) "ANSWER" else "TAP TO FLIP",
                             style = MicroTagMono,
-                            color = accent,
+                            color = tokens.inkSecondary,
                         )
                     }
                 }
@@ -730,7 +1140,7 @@ private fun InlineVaultFlashcardPreview(
                         Text(
                             text = card.formulaHint,
                             style = FormulaMonoDisplay,
-                            color = accent,
+                            color = tokens.inkPrimary,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                         )
                     }
@@ -741,243 +1151,149 @@ private fun InlineVaultFlashcardPreview(
 }
 
 /**
- * SUB-VIEW 3: Revision — Strictly Organized Subject -> Chapter -> Lecture
- * Distinct 3-tier hierarchy: Top Subject Selector Strip -> Chapter Section Rails -> Indented Lecture Digests.
+ * SUB-VIEW 3: Revision — Recents + Subject -> Chapter -> Lecture Revision Digests ONLY
  */
 @Composable
 fun VaultRevisionSubView(
     state: PwVaultUiState,
-    onSelectRevisionSubject: (String) -> Unit,
+    onSelectSubject: (String) -> Unit,
+    onSelectChapter: (String) -> Unit,
+    onOpenRecentLecture: (VaultLectureNode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val subjects = state.subjectsForSelectedBatch
-    val activeSubject: VaultSubjectNode? = subjects.firstOrNull { it.id == state.selectedRevisionSubjectId }
-        ?: subjects.firstOrNull()
+    val depth = when {
+        state.selectedChapter != null -> CategoryDrillDepth.LECTURES
+        state.selectedSubject != null -> CategoryDrillDepth.CHAPTERS
+        else -> CategoryDrillDepth.SUBJECTS
+    }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("vault_subview_revision_tree"),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.vault_revision_grouping_hint).uppercase(),
-                style = MicroTagMono,
-                color = tokens.inkMuted,
+    AnimatedContent(
+        targetState = Triple(depth, state.selectedSubject?.id, state.selectedChapter?.id),
+        transitionSpec = {
+            val deeper = targetState.first.ordinal >= initialState.first.ordinal
+            val dir = if (deeper) 1 else -1
+            (fadeIn(tween(200)) + slideInHorizontally(spring(0.86f, 400f)) { dir * (it / 16) }) togetherWith
+                (fadeOut(tween(140)) + slideOutHorizontally(spring(0.86f, 400f)) { -dir * (it / 20) })
+        },
+        label = "vaultRevisionDepth",
+        modifier = modifier.fillMaxSize(),
+    ) { (activeDepth, _, _) ->
+        when (activeDepth) {
+            CategoryDrillDepth.SUBJECTS -> CategorySubjectHierarchyGrid(
+                subjects = state.subjectsForSelectedBatch,
+                mode = VaultCategorySubView.REVISION,
+                recentsHeading = stringResource(R.string.vault_recents_revision_label),
+                recentLectures = state.recentRevisionLectures,
+                onSelectRecent = onOpenRecentLecture,
+                onSelectSubject = onSelectSubject,
             )
-            if (activeSubject != null) {
-                Text(
-                    text = "${activeSubject.chapters.size} Chapters · ${activeSubject.totalLectures} Lecture Sheets",
-                    style = MonoBadgeStyle,
-                    color = tokens.inkSecondary,
-                )
-            }
-        }
 
-        // TIER 1: Subject Selector Tabs
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            subjects.forEach { subject ->
-                val selected = subject.id == activeSubject?.id
-                val accent = subject.accentMood.accent
-                val interaction = remember { MutableInteractionSource() }
-                val bg by animateColorAsState(
-                    targetValue = if (selected) tokens.slateElevated else tokens.obsidianSurface,
-                    animationSpec = spring(stiffness = 400f),
-                    label = "revSubjBg_${subject.id}",
-                )
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = bg,
-                    border = BorderStroke(
-                        1.dp,
-                        if (selected) accent.copy(alpha = 0.45f) else tokens.hairlineRest,
-                    ),
+            CategoryDrillDepth.CHAPTERS -> CategoryChapterHierarchyGrid(
+                subject = state.selectedSubject ?: return@AnimatedContent,
+                mode = VaultCategorySubView.REVISION,
+                onSelectChapter = onSelectChapter,
+            )
+
+            CategoryDrillDepth.LECTURES -> {
+                val chapter = state.selectedChapter ?: return@AnimatedContent
+                LazyColumn(
                     modifier = Modifier
-                        .testTag("vault_rev_subject_tab_${subject.id}")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(interaction, 0.96f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = interaction,
-                            indication = ripple(color = accent.copy(alpha = 0.16f)),
-                            role = Role.Tab,
-                            onClick = { onSelectRevisionSubject(subject.id) },
-                        ),
+                        .fillMaxSize()
+                        .testTag("vault_subview_revision_tree"),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 20.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(accent),
-                        )
+                    item(key = "rev_chapter_header") {
                         Text(
-                            text = subject.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = if (selected) tokens.inkPrimary else tokens.inkSecondary,
-                        )
-                        Text(
-                            text = "${subject.totalLectures}",
+                            text = "${chapter.chapterCode} · REVISION SHEETS ONLY (${chapter.lectures.size} LECTURES)",
                             style = MicroTagMono,
                             color = tokens.inkMuted,
                         )
                     }
-                }
-            }
-        }
 
-        // TIER 2 (Chapters) -> TIER 3 (Lectures)
-        if (activeSubject != null) {
-            AnimatedContent(
-                targetState = activeSubject,
-                contentKey = { it.id },
-                transitionSpec = {
-                    (fadeIn(tween(200)) + slideInVertically(spring(0.86f, 400f)) { it / 24 }) togetherWith
-                        fadeOut(tween(140))
-                },
-                label = "vaultRevisionSubjectSwitch",
-                modifier = Modifier.weight(1f),
-            ) { subjectNode ->
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 20.dp),
-                ) {
-                    items(items = subjectNode.chapters, key = { it.id }) { chapter ->
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            // Tier 2: Chapter Rail Header
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    itemsIndexed(items = chapter.lectures, key = { _, lec -> lec.id }) { idx, lecture ->
+                        StaggeredEntrance(delayMillis = 35L * idx) {
+                            ObsidianCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("vault_rev_lecture_${lecture.id}"),
+                                containerColor = tokens.obsidianSurface,
+                                cornerRadius = 18.dp,
+                                contentPadding = PaddingValues(16.dp),
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(7.dp),
-                                    color = tokens.carbonSurface,
-                                    border = BorderStroke(1.dp, subjectNode.accentMood.accent.copy(alpha = 0.34f)),
-                                ) {
-                                    Text(
-                                        text = chapter.chapterCode,
-                                        style = MicroTagMono,
-                                        color = subjectNode.accentMood.accent,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    )
-                                }
-                                Text(
-                                    text = chapter.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = tokens.inkPrimary,
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(1.dp)
-                                        .background(tokens.hairlineSubtle),
-                                )
-                            }
-
-                            // Tier 3: Indented Lecture Revision Digest Sheets
-                            chapter.lectures.forEach { lecture ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(2.dp)
-                                            .height(110.dp)
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .background(subjectNode.accentMood.accent.copy(alpha = 0.32f)),
-                                    )
-
-                                    ObsidianCard(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("vault_rev_lecture_${lecture.id}"),
-                                        containerColor = tokens.obsidianSurface,
-                                        cornerRadius = 16.dp,
-                                        contentPadding = PaddingValues(15.dp),
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                            ) {
-                                                Text(
-                                                    text = "${lecture.lectureCode} · ${lecture.title}",
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = tokens.inkPrimary,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                                if (lecture.isAutoSavedFromYesterday) {
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(
-                                                        text = "YESTERDAY'S AI DIGEST",
-                                                        style = MicroTagMono,
-                                                        color = AccentMood.EMERALD.accent,
-                                                    )
-                                                }
-                                            }
-
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(lecture.subjectMood.accent),
+                                            )
                                             Text(
-                                                text = lecture.revisionHeadline,
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                text = "${lecture.lectureCode} · ${lecture.title}",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = tokens.inkPrimary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (lecture.isAutoSavedFromYesterday) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "AUTO-SAVED",
+                                                style = MicroTagMono,
+                                                color = AccentMood.EMERALD.accent,
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = lecture.revisionHeadline,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = tokens.inkSecondary,
+                                    )
+
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = tokens.carbonSurface,
+                                        border = BorderStroke(1.dp, tokens.hairlineSubtle),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(
+                                            text = lecture.revisionFormula,
+                                            style = FormulaMonoDisplay,
+                                            color = tokens.inkPrimary,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                        )
+                                    }
+
+                                    lecture.revisionKeyPoints.forEach { pt ->
+                                        Row(
+                                            verticalAlignment = Alignment.Top,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(top = 6.dp)
+                                                    .size(4.dp)
+                                                    .clip(CircleShape)
+                                                    .background(tokens.inkMuted),
+                                            )
+                                            Text(
+                                                text = pt,
+                                                style = MaterialTheme.typography.bodySmall,
                                                 color = tokens.inkSecondary,
                                             )
-
-                                            Surface(
-                                                shape = RoundedCornerShape(10.dp),
-                                                color = tokens.carbonSurface,
-                                                border = BorderStroke(1.dp, tokens.hairlineSubtle),
-                                                modifier = Modifier.fillMaxWidth(),
-                                            ) {
-                                                Text(
-                                                    text = lecture.revisionFormula,
-                                                    style = FormulaMonoDisplay,
-                                                    color = subjectNode.accentMood.accent,
-                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                                )
-                                            }
-
-                                            lecture.revisionKeyPoints.forEach { pt ->
-                                                Row(
-                                                    verticalAlignment = Alignment.Top,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .padding(top = 6.dp)
-                                                            .size(4.dp)
-                                                            .clip(CircleShape)
-                                                            .background(tokens.inkMuted),
-                                                    )
-                                                    Text(
-                                                        text = pt,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = tokens.inkSecondary,
-                                                    )
-                                                }
-                                            }
                                         }
                                     }
                                 }

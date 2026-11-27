@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 16:9 Landscape Screen Layout Configuration -->
+    <dimen name="screen_horizontal_padding">28dp</dimen>
+    <dimen name="screen_vertical_padding">20dp</dimen>
+    <dimen name="section_spacing">18dp</dimen>
+    <dimen name="card_padding">20dp</dimen>
+    <dimen name="card_corner_radius">20dp</dimen>
+    <dimen name="daily_card_height">178dp</dimen>
+    <dimen name="hero_banner_height">152dp</dimen>
+    <dimen name="nav_rail_width">88dp</dimen>
+    <dimen name="max_content_width">1340dp</dimen>
+
+    <integer name="vault_subject_columns">3</integer>
+    <integer name="vault_chapter_columns">2</integer>
+    <bool name="is_landscape_16_9">true</bool>
+</resources>

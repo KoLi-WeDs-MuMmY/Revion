@@ -11,6 +11,7 @@ data class BatchChapter(
     val progressPercent: Int,
     val isCompleted: Boolean,
     val materialCount: Int,
+    val lectures: List<VaultLectureNode> = emptyList(),
 )
 
 @Immutable
@@ -83,7 +84,9 @@ data class BatchesUiState(
     val batches: List<StudyBatch>,
     val selectedBatchId: String,
     val expandedSubjectId: String? = null,
+    val expandedChapterId: String? = null,
     val isBuilderOpen: Boolean = false,
+    val activeCrudDialog: BatchCrudDialog? = null,
 ) {
     val selectedBatch: StudyBatch?
         get() = batches.firstOrNull { it.id == selectedBatchId } ?: batches.firstOrNull()

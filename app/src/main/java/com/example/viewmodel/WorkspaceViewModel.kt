@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.AiPermissionRequest
 import com.example.model.BatchChapter
+import com.example.model.BatchCrudDialog
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
 import com.example.model.CounterProposal
@@ -125,6 +126,7 @@ class WorkspaceViewModel : ViewModel() {
                 batchesState = state.batchesState.copy(
                     selectedBatchId = batchId,
                     expandedSubjectId = firstSubjectId,
+                    expandedChapterId = null,
                 ),
             )
         }
@@ -136,44 +138,548 @@ class WorkspaceViewModel : ViewModel() {
             state.copy(
                 batchesState = state.batchesState.copy(
                     expandedSubjectId = if (current == subjectId) null else subjectId,
+                    expandedChapterId = null,
+                ),
+            )
+        }
+    }
+
+    fun toggleExpandChapterInBatches(chapterId: String) {
+        _uiState.update { state ->
+            val current = state.batchesState.expandedChapterId
+            state.copy(
+                batchesState = state.batchesState.copy(
+                    expandedChapterId = if (current == chapterId) null else chapterId,
                 ),
             )
         }
     }
 
     fun toggleChapterCompleted(batchId: String, subjectId: String, chapterId: String) {
-        _uiState.update { state ->
-            val updatedBatches = state.batchesState.batches.map { batch ->
-                if (batch.id != batchId) return@map batch
-                val updatedSubjects = batch.subjects.map { subject ->
-                    if (subject.id != subjectId) return@map subject
-                    val updatedChapters = subject.chapters.map { chapter ->
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subject ->
+                if (subject.id != subjectId) return@map subject
+                subject.copy(
+                    chapters = subject.chapters.map { chapter ->
                         if (chapter.id != chapterId) return@map chapter
-                        val nowCompleted = !chapter.isCompleted
+                        val allDone = chapter.lectures.isNotEmpty() && chapter.lectures.all { it.isCompleted }
+                        val targetDone = !allDone
                         chapter.copy(
-                            isCompleted = nowCompleted,
-                            progressPercent = if (nowCompleted) 100 else 55,
+                            lectures = chapter.lectures.map { lec -> lec.copy(isCompleted = targetDone) },
                         )
-                    }
-                    val avgMastery = if (updatedChapters.isEmpty()) {
-                        subject.masteryPercent
-                    } else {
-                        updatedChapters.sumOf { it.progressPercent } / updatedChapters.size
-                    }
-                    val doneLectures = updatedChapters
-                        .filter { it.isCompleted }
-                        .sumOf { it.lectureCount }
-                        .coerceAtMost(subject.lectureCount)
-                    subject.copy(
-                        chapters = updatedChapters,
-                        masteryPercent = avgMastery,
-                        completedLectures = doneLectures,
-                    )
-                }
-                batch.copy(subjects = updatedSubjects)
+                    },
+                )
             }
+        }
+    }
+
+    // --- Phase 1.6.1.1: Full Batches / Subjects / Chapters / Lectures CRUD ---
+
+    fun openBatchCrudDialog(dialog: BatchCrudDialog) {
+        _uiState.update { state ->
+            state.copy(batchesState = state.batchesState.copy(activeCrudDialog = dialog))
+        }
+    }
+
+    fun closeBatchCrudDialog() {
+        _uiState.update { state ->
+            state.copy(batchesState = state.batchesState.copy(activeCrudDialog = null))
+        }
+    }
+
+    fun editBatch(
+        batchId: String,
+        name: String,
+        goalTag: String,
+        targetDateLabel: String,
+        accentMood: AccentMood,
+    ) {
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
+        val cleanGoal = goalTag.trim().ifEmpty { "Custom Track" }
+        val cleanTarget = targetDateLabel.trim().ifEmpty { "Active Track" }
+        _uiState.update { state ->
             state.copy(
-                batchesState = state.batchesState.copy(batches = updatedBatches),
+                batchesState = state.batchesState.copy(
+                    batches = state.batchesState.batches.map { batch ->
+                        if (batch.id != batchId) batch else batch.copy(
+                            name = cleanName,
+                            goalTag = cleanGoal,
+                            targetDateLabel = cleanTarget,
+                            accentMood = accentMood,
+                        )
+                    },
+                    activeCrudDialog = null,
+                ),
+            )
+        }
+    }
+
+    fun deleteBatch(batchId: String) {
+        _uiState.update { state ->
+            if (state.batchesState.batches.size <= 1) {
+                return@update state.copy(batchesState = state.batchesState.copy(activeCrudDialog = null))
+            }
+            val remaining = state.batchesState.batches.filterNot { it.id == batchId }
+            val fallbackBatch = remaining.first()
+            val nextPrimaryId = if (state.primaryBatchId == batchId) fallbackBatch.id else state.primaryBatchId
+            val nextSelectedId = if (state.batchesState.selectedBatchId == batchId) fallbackBatch.id else state.batchesState.selectedBatchId
+            val nextVaultBatchId = if (state.pwVaultState.selectedBatchId == batchId) nextPrimaryId else state.pwVaultState.selectedBatchId
+            val updatedMap = state.pwVaultState.subjectsByBatch - batchId
+            val nextVaultSubjects = updatedMap[nextVaultBatchId].orEmpty()
+
+            state.copy(
+                primaryBatchId = nextPrimaryId,
+                batchesState = state.batchesState.copy(
+                    batches = remaining,
+                    selectedBatchId = nextSelectedId,
+                    expandedSubjectId = remaining.firstOrNull { it.id == nextSelectedId }?.subjects?.firstOrNull()?.id,
+                    expandedChapterId = null,
+                    activeCrudDialog = null,
+                ),
+                pwVaultState = state.pwVaultState.copy(
+                    subjectsByBatch = updatedMap,
+                    selectedBatchId = nextVaultBatchId,
+                    selectedSubjectId = if (state.pwVaultState.selectedBatchId == batchId) null else state.pwVaultState.selectedSubjectId,
+                    selectedChapterId = if (state.pwVaultState.selectedBatchId == batchId) null else state.pwVaultState.selectedChapterId,
+                    selectedLectureId = if (state.pwVaultState.selectedBatchId == batchId) null else state.pwVaultState.selectedLectureId,
+                    selectedRevisionSubjectId = nextVaultSubjects.firstOrNull()?.id,
+                ),
+            )
+        }
+    }
+
+    fun addSubjectToBatch(
+        batchId: String,
+        name: String,
+        accentMood: AccentMood,
+    ) {
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val subjectId = "pw_${batchId}_sub_$now"
+        val chapterId = "ch_${subjectId}_1"
+        val lectureId = "lec_${chapterId}_1"
+        val starterLecture = createStarterLecture(
+            id = lectureId,
+            batchId = batchId,
+            subjectId = subjectId,
+            subjectName = cleanName,
+            subjectMood = accentMood,
+            chapterId = chapterId,
+            chapterTitle = "$cleanName Foundations",
+            lectureNumber = 1,
+            title = "$cleanName Core Concepts & Overview",
+            durationLabel = "1h 00m",
+        )
+        val newSubject = VaultSubjectNode(
+            id = subjectId,
+            batchId = batchId,
+            name = cleanName,
+            accentMood = accentMood,
+            chapters = listOf(
+                VaultChapterNode(
+                    id = chapterId,
+                    batchId = batchId,
+                    subjectId = subjectId,
+                    subjectName = cleanName,
+                    subjectMood = accentMood,
+                    chapterCode = "CH 01",
+                    title = "$cleanName Foundations",
+                    lectures = listOf(starterLecture),
+                ),
+            ),
+        )
+        mutateVaultSubjectsForBatch(
+            batchId = batchId,
+            expandSubjectId = subjectId,
+            expandChapterId = chapterId,
+        ) { subjects ->
+            subjects + newSubject
+        }
+    }
+
+    fun editSubject(
+        batchId: String,
+        subjectId: String,
+        name: String,
+        accentMood: AccentMood,
+    ) {
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    name = cleanName,
+                    accentMood = accentMood,
+                    chapters = subj.chapters.map { ch ->
+                        ch.copy(
+                            subjectName = cleanName,
+                            subjectMood = accentMood,
+                            lectures = ch.lectures.map { lec ->
+                                lec.copy(
+                                    subjectName = cleanName,
+                                    subjectMood = accentMood,
+                                    flashcardDeck = lec.flashcardDeck.map { fc ->
+                                        fc.copy(subjectName = cleanName, accentMood = accentMood)
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun deleteSubject(batchId: String, subjectId: String) {
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.filterNot { it.id == subjectId }
+        }
+    }
+
+    fun addChapterToSubject(
+        batchId: String,
+        subjectId: String,
+        title: String,
+    ) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val chapterId = "ch_${subjectId}_$now"
+        mutateVaultSubjectsForBatch(
+            batchId = batchId,
+            expandSubjectId = subjectId,
+            expandChapterId = chapterId,
+        ) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                val nextIndex = subj.chapters.size + 1
+                val code = "CH " + nextIndex.toString().padStart(2, '0')
+                val starterLec = createStarterLecture(
+                    id = "lec_${chapterId}_1",
+                    batchId = batchId,
+                    subjectId = subjectId,
+                    subjectName = subj.name,
+                    subjectMood = subj.accentMood,
+                    chapterId = chapterId,
+                    chapterTitle = cleanTitle,
+                    lectureNumber = 1,
+                    title = "$cleanTitle — Lecture 01",
+                    durationLabel = "1h 10m",
+                )
+                subj.copy(
+                    chapters = subj.chapters + VaultChapterNode(
+                        id = chapterId,
+                        batchId = batchId,
+                        subjectId = subjectId,
+                        subjectName = subj.name,
+                        subjectMood = subj.accentMood,
+                        chapterCode = code,
+                        title = cleanTitle,
+                        lectures = listOf(starterLec),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun editChapter(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        title: String,
+    ) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    chapters = subj.chapters.map { ch ->
+                        if (ch.id != chapterId) return@map ch
+                        ch.copy(
+                            title = cleanTitle,
+                            lectures = ch.lectures.map { lec ->
+                                lec.copy(
+                                    chapterTitle = cleanTitle,
+                                    flashcardDeck = lec.flashcardDeck.map { fc ->
+                                        fc.copy(chapterTitle = cleanTitle)
+                                    },
+                                )
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun deleteChapter(batchId: String, subjectId: String, chapterId: String) {
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                val remaining = subj.chapters.filterNot { it.id == chapterId }
+                    .mapIndexed { idx, ch ->
+                        ch.copy(chapterCode = "CH " + (idx + 1).toString().padStart(2, '0'))
+                    }
+                subj.copy(chapters = remaining)
+            }
+        }
+    }
+
+    fun addLectureToChapter(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        title: String,
+        durationLabel: String,
+    ) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        val cleanDuration = durationLabel.trim().ifEmpty { "1h 05m" }
+        val lectureId = "lec_${chapterId}_${System.currentTimeMillis()}"
+        mutateVaultSubjectsForBatch(
+            batchId = batchId,
+            expandSubjectId = subjectId,
+            expandChapterId = chapterId,
+        ) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    chapters = subj.chapters.map { ch ->
+                        if (ch.id != chapterId) return@map ch
+                        val nextNum = ch.lectures.size + 1
+                        val newLecture = createStarterLecture(
+                            id = lectureId,
+                            batchId = batchId,
+                            subjectId = subjectId,
+                            subjectName = subj.name,
+                            subjectMood = subj.accentMood,
+                            chapterId = chapterId,
+                            chapterTitle = ch.title,
+                            lectureNumber = nextNum,
+                            title = cleanTitle,
+                            durationLabel = cleanDuration,
+                        )
+                        ch.copy(lectures = ch.lectures + newLecture)
+                    },
+                )
+            }
+        }
+    }
+
+    fun editLecture(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        lectureId: String,
+        title: String,
+        durationLabel: String,
+    ) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        val cleanDuration = durationLabel.trim().ifEmpty { "1h 05m" }
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    chapters = subj.chapters.map { ch ->
+                        if (ch.id != chapterId) return@map ch
+                        ch.copy(
+                            lectures = ch.lectures.map { lec ->
+                                if (lec.id != lectureId) return@map lec
+                                val slug = cleanTitle.replace(Regex("[^A-Za-z0-9]+"), "_").take(26)
+                                lec.copy(
+                                    title = cleanTitle,
+                                    durationLabel = cleanDuration,
+                                    notesTitle = "${lec.lectureCode}_${slug}_Notes.pdf",
+                                    classLabel = "Class ${lec.lectureNumber.toString().padStart(2, '0')} · ${cleanTitle.take(24)}",
+                                )
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun toggleLectureCompleted(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        lectureId: String,
+    ) {
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    chapters = subj.chapters.map { ch ->
+                        if (ch.id != chapterId) return@map ch
+                        ch.copy(
+                            lectures = ch.lectures.map { lec ->
+                                if (lec.id != lectureId) lec else lec.copy(isCompleted = !lec.isCompleted)
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    fun deleteLecture(
+        batchId: String,
+        subjectId: String,
+        chapterId: String,
+        lectureId: String,
+    ) {
+        mutateVaultSubjectsForBatch(batchId) { subjects ->
+            subjects.map { subj ->
+                if (subj.id != subjectId) return@map subj
+                subj.copy(
+                    chapters = subj.chapters.map { ch ->
+                        if (ch.id != chapterId) return@map ch
+                        val remaining = ch.lectures.filterNot { it.id == lectureId }
+                            .mapIndexed { idx, lec ->
+                                val num = idx + 1
+                                lec.copy(
+                                    lectureNumber = num,
+                                    lectureCode = "L" + num.toString().padStart(2, '0'),
+                                )
+                            }
+                        ch.copy(lectures = remaining)
+                    },
+                )
+            }
+        }
+    }
+
+    private fun mutateVaultSubjectsForBatch(
+        batchId: String,
+        expandSubjectId: String? = null,
+        expandChapterId: String? = null,
+        transform: (List<VaultSubjectNode>) -> List<VaultSubjectNode>,
+    ) {
+        _uiState.update { state ->
+            val currentSubjects = state.pwVaultState.subjectsByBatch[batchId].orEmpty()
+            val updatedSubjects = transform(currentSubjects)
+            val updatedMap = state.pwVaultState.subjectsByBatch + (batchId to updatedSubjects)
+            val syncedBatchSubjects = buildBatchSubjectsFromVault(updatedSubjects)
+
+            val updatedBatches = state.batchesState.batches.map { batch ->
+                if (batch.id != batchId) batch else batch.copy(subjects = syncedBatchSubjects)
+            }
+
+            // Clean up any dangling Vault selection pointers if an item was deleted
+            val validSubject = updatedSubjects.firstOrNull { it.id == state.pwVaultState.selectedSubjectId }
+            val validChapter = validSubject?.chapters?.firstOrNull { it.id == state.pwVaultState.selectedChapterId }
+            val validLecture = validChapter?.lectures?.firstOrNull { it.id == state.pwVaultState.selectedLectureId }
+
+            state.copy(
+                batchesState = state.batchesState.copy(
+                    batches = updatedBatches,
+                    expandedSubjectId = expandSubjectId ?: state.batchesState.expandedSubjectId?.takeIf { id ->
+                        syncedBatchSubjects.any { it.id == id }
+                    },
+                    expandedChapterId = expandChapterId ?: state.batchesState.expandedChapterId,
+                    activeCrudDialog = null,
+                ),
+                pwVaultState = state.pwVaultState.copy(
+                    subjectsByBatch = updatedMap,
+                    selectedSubjectId = if (state.pwVaultState.selectedBatchId == batchId) validSubject?.id else state.pwVaultState.selectedSubjectId,
+                    selectedChapterId = if (state.pwVaultState.selectedBatchId == batchId) validChapter?.id else state.pwVaultState.selectedChapterId,
+                    selectedLectureId = if (state.pwVaultState.selectedBatchId == batchId) validLecture?.id else state.pwVaultState.selectedLectureId,
+                ),
+            )
+        }
+    }
+
+    private fun createStarterLecture(
+        id: String,
+        batchId: String,
+        subjectId: String,
+        subjectName: String,
+        subjectMood: AccentMood,
+        chapterId: String,
+        chapterTitle: String,
+        lectureNumber: Int,
+        title: String,
+        durationLabel: String,
+    ): VaultLectureNode {
+        val code = "L" + lectureNumber.toString().padStart(2, '0')
+        val slug = title.replace(Regex("[^A-Za-z0-9]+"), "_").take(26)
+        val classLabel = "Class ${lectureNumber.toString().padStart(2, '0')} · ${title.take(24)}"
+        return VaultLectureNode(
+            id = id,
+            batchId = batchId,
+            subjectId = subjectId,
+            subjectName = subjectName,
+            subjectMood = subjectMood,
+            chapterId = chapterId,
+            chapterTitle = chapterTitle,
+            lectureNumber = lectureNumber,
+            lectureCode = code,
+            title = title,
+            durationLabel = durationLabel,
+            dateLabel = "Custom Lecture",
+            isCompleted = false,
+            notesTitle = "${code}_${slug}_Notes.pdf",
+            notesPageCount = 16,
+            notesSummary = "Class notes and structured derivations for $title ($chapterTitle).",
+            notesHighlights = listOf(
+                "Core concepts & solved examples for $title",
+                "Indexed for chapter RAG attachment in AI Tutor",
+            ),
+            classLabel = classLabel,
+            flashcardDeck = listOf(
+                DailyFlashcardItem(
+                    id = "fc_${id}_1",
+                    subjectName = subjectName,
+                    accentMood = subjectMood,
+                    chapterTitle = chapterTitle,
+                    classLabel = classLabel,
+                    frontPrompt = "What is the key conceptual takeaway from $title?",
+                    backAnswer = "Master the core relationship and boundary conditions introduced in $title before timed drills.",
+                    formulaHint = "$code · $chapterTitle",
+                ),
+            ),
+            revisionHeadline = "Focused revision takeaways for $title.",
+            revisionFormula = "$subjectName · $code Key Relationship",
+            revisionKeyPoints = listOf(
+                "Review primary derivation steps from $title",
+                "Check common boundary traps before advancing",
+            ),
+        )
+    }
+
+    private fun buildBatchSubjectsFromVault(vaultSubjects: List<VaultSubjectNode>): List<BatchSubject> {
+        return vaultSubjects.map { vs ->
+            val batchChapters = vs.chapters.map { ch ->
+                val total = ch.lectures.size
+                val done = ch.lectures.count { it.isCompleted }
+                val pct = if (total == 0) 0 else (done * 100) / total
+                BatchChapter(
+                    id = ch.id,
+                    title = ch.title,
+                    lectureCount = total,
+                    progressPercent = pct,
+                    isCompleted = total > 0 && done == total,
+                    materialCount = total.coerceAtLeast(1),
+                    lectures = ch.lectures,
+                )
+            }
+            val totalLecs = vs.totalLectures
+            val doneLecs = vs.completedLectures
+            val mastery = if (totalLecs == 0) 0 else (doneLecs * 100) / totalLecs
+            BatchSubject(
+                id = vs.id,
+                name = vs.name,
+                accentMood = vs.accentMood,
+                lectureCount = totalLecs,
+                completedLectures = doneLecs,
+                masteryPercent = mastery,
+                chapters = batchChapters,
             )
         }
     }
@@ -217,43 +723,81 @@ class WorkspaceViewModel : ViewModel() {
             )
         }
 
-        val createdSubjects = baseSubjects.mapIndexed { idx, template ->
-            val subjectId = "${batchId}_sub_$idx"
-            BatchSubject(
+        val starterPwSubjects = baseSubjects.mapIndexed { sIdx, template ->
+            val subjectId = "pw_${batchId}_sub_$sIdx"
+            val ch1Id = "${subjectId}_ch_1"
+            val ch2Id = "${subjectId}_ch_2"
+            val ch1Title = "${template.name} Foundations & Core Laws"
+            val ch2Title = "${template.name} High-Yield Problem Patterns"
+            VaultSubjectNode(
                 id = subjectId,
+                batchId = batchId,
                 name = template.name,
                 accentMood = template.accentMood,
-                lectureCount = template.defaultLectures,
-                completedLectures = 2,
-                masteryPercent = 24,
                 chapters = listOf(
-                    BatchChapter(
-                        id = "${subjectId}_ch_1",
-                        title = "${template.name} Foundations & Core Laws",
-                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
-                        progressPercent = 45,
-                        isCompleted = false,
-                        materialCount = 1,
+                    VaultChapterNode(
+                        id = ch1Id,
+                        batchId = batchId,
+                        subjectId = subjectId,
+                        subjectName = template.name,
+                        subjectMood = template.accentMood,
+                        chapterCode = "CH 01",
+                        title = ch1Title,
+                        lectures = listOf(
+                            createStarterLecture(
+                                id = "pw_lec_${ch1Id}_01",
+                                batchId = batchId,
+                                subjectId = subjectId,
+                                subjectName = template.name,
+                                subjectMood = template.accentMood,
+                                chapterId = ch1Id,
+                                chapterTitle = ch1Title,
+                                lectureNumber = 1,
+                                title = "${template.name} Kickoff & Core Principles",
+                                durationLabel = "1h 05m",
+                            ),
+                            createStarterLecture(
+                                id = "pw_lec_${ch1Id}_02",
+                                batchId = batchId,
+                                subjectId = subjectId,
+                                subjectName = template.name,
+                                subjectMood = template.accentMood,
+                                chapterId = ch1Id,
+                                chapterTitle = ch1Title,
+                                lectureNumber = 2,
+                                title = "${template.name} Derivations & Boundary Cases",
+                                durationLabel = "1h 12m",
+                            ),
+                        ),
                     ),
-                    BatchChapter(
-                        id = "${subjectId}_ch_2",
-                        title = "${template.name} High-Yield Problem Patterns",
-                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
-                        progressPercent = 18,
-                        isCompleted = false,
-                        materialCount = 1,
-                    ),
-                    BatchChapter(
-                        id = "${subjectId}_ch_3",
-                        title = "${template.name} Synthesis & Timed Recall",
-                        lectureCount = (template.defaultLectures / 3).coerceAtLeast(3),
-                        progressPercent = 8,
-                        isCompleted = false,
-                        materialCount = 1,
+                    VaultChapterNode(
+                        id = ch2Id,
+                        batchId = batchId,
+                        subjectId = subjectId,
+                        subjectName = template.name,
+                        subjectMood = template.accentMood,
+                        chapterCode = "CH 02",
+                        title = ch2Title,
+                        lectures = listOf(
+                            createStarterLecture(
+                                id = "pw_lec_${ch2Id}_01",
+                                batchId = batchId,
+                                subjectId = subjectId,
+                                subjectName = template.name,
+                                subjectMood = template.accentMood,
+                                chapterId = ch2Id,
+                                chapterTitle = ch2Title,
+                                lectureNumber = 1,
+                                title = "${template.name} Speed Drills & PYQ Patterns",
+                                durationLabel = "58m",
+                            ),
+                        ),
                     ),
                 ),
             )
         }
+
+        val createdSubjects = buildBatchSubjectsFromVault(starterPwSubjects)
 
         val newBatch = StudyBatch(
             id = batchId,
@@ -265,7 +809,6 @@ class WorkspaceViewModel : ViewModel() {
             subjects = createdSubjects,
         )
 
-        // Also seed a starter mock Vault material so the new batch appears live in Vault
         val firstSubject = createdSubjects.first()
         val starterMaterial = VaultMaterial(
             id = "mat_starter_${System.currentTimeMillis()}",
@@ -287,76 +830,13 @@ class WorkspaceViewModel : ViewModel() {
             },
         )
 
-        val starterPwSubjects = createdSubjects.mapIndexed { sIdx, sub ->
-            val chapter = sub.chapters.first()
-            VaultSubjectNode(
-                id = "pw_${sub.id}",
-                batchId = batchId,
-                name = sub.name,
-                accentMood = sub.accentMood,
-                chapters = listOf(
-                    VaultChapterNode(
-                        id = "pw_${chapter.id}",
-                        batchId = batchId,
-                        subjectId = "pw_${sub.id}",
-                        subjectName = sub.name,
-                        subjectMood = sub.accentMood,
-                        chapterCode = "CH 0${sIdx + 1}",
-                        title = chapter.title,
-                        lectures = listOf(
-                            VaultLectureNode(
-                                id = "pw_lec_${sub.id}_01",
-                                batchId = batchId,
-                                subjectId = "pw_${sub.id}",
-                                subjectName = sub.name,
-                                subjectMood = sub.accentMood,
-                                chapterId = "pw_${chapter.id}",
-                                chapterTitle = chapter.title,
-                                lectureNumber = 1,
-                                lectureCode = "L01",
-                                title = "${sub.name} Kickoff & Core Principles",
-                                durationLabel = "1h 05m",
-                                dateLabel = "Ready to Study",
-                                isCompleted = false,
-                                notesTitle = "L01_${sub.name}_Starter_ClassNotes.pdf",
-                                notesPageCount = 14,
-                                notesSummary = "Structured starter class notes and syllabus anchors for ${sub.name} in $trimmedName.",
-                                notesHighlights = listOf(
-                                    "Key definitions and core formula sheet for ${chapter.title}",
-                                    "Indexed for whole-chapter AI Tutor RAG attachment",
-                                ),
-                                classLabel = "Class 01 · Starter Deck",
-                                flashcardDeck = listOf(
-                                    DailyFlashcardItem(
-                                        id = "fc_custom_${sub.id}_1",
-                                        subjectName = sub.name,
-                                        accentMood = sub.accentMood,
-                                        chapterTitle = chapter.title,
-                                        classLabel = "Class 01 · Starter Deck",
-                                        frontPrompt = "What is the foundational objective of ${chapter.title}?",
-                                        backAnswer = "Master core derivations and high-yield problem patterns before timed drills.",
-                                        formulaHint = "Concept Anchor → Worked Derivation → Recall",
-                                    ),
-                                ),
-                                revisionHeadline = "Foundation digest for ${chapter.title} inside $trimmedName.",
-                                revisionFormula = "${sub.name} Core Anchor · Track Blueprint",
-                                revisionKeyPoints = listOf(
-                                    "Complete Lecture 01 notes before opening problem sets",
-                                    "Attach this lecture PDF directly when asking AI Tutor doubts",
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            )
-        }
-
         _uiState.update { state ->
             state.copy(
                 batchesState = state.batchesState.copy(
                     batches = listOf(newBatch) + state.batchesState.batches,
                     selectedBatchId = batchId,
                     expandedSubjectId = firstSubject.id,
+                    expandedChapterId = firstSubject.chapters.firstOrNull()?.id,
                     isBuilderOpen = false,
                 ),
                 vaultState = state.vaultState.copy(
@@ -1498,7 +1978,7 @@ class WorkspaceViewModel : ViewModel() {
                     selectedSubjectId = subjectId,
                     selectedChapterId = null,
                     selectedLectureId = null,
-                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                    selectedRevisionSubjectId = subjectId ?: state.pwVaultState.selectedRevisionSubjectId,
                 ),
             )
         }
@@ -1507,19 +1987,21 @@ class WorkspaceViewModel : ViewModel() {
     fun selectPwVaultChapter(chapterId: String?) {
         _uiState.update { state ->
             val current = state.pwVaultState
-            val resolvedSubjectId = if (chapterId != null) {
+            val targetChapter = if (chapterId != null) {
                 current.subjectsForSelectedBatch
-                    .firstOrNull { subj -> subj.chapters.any { it.id == chapterId } }
-                    ?.id ?: current.selectedSubjectId
-            } else {
-                current.selectedSubjectId
-            }
+                    .flatMap { it.chapters }
+                    .firstOrNull { it.id == chapterId }
+            } else null
+            val resolvedSubjectId = targetChapter?.subjectId ?: current.selectedSubjectId
+            val firstCardId = targetChapter?.lectures?.firstOrNull()?.flashcardDeck?.firstOrNull()?.id
             state.copy(
                 pwVaultState = current.copy(
                     selectedSubjectId = resolvedSubjectId,
                     selectedChapterId = chapterId,
                     selectedLectureId = null,
-                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                    expandedFlashcardChapterId = chapterId ?: current.expandedFlashcardChapterId,
+                    previewFlashcardId = firstCardId ?: current.previewFlashcardId,
+                    isPreviewCardFlipped = false,
                 ),
             )
         }
@@ -1529,12 +2011,27 @@ class WorkspaceViewModel : ViewModel() {
         _uiState.update { state ->
             val current = state.pwVaultState
             val lec = current.allLecturesInBatch.firstOrNull { it.id == lectureId }
+            val updatedRecents = if (lec != null) {
+                when (current.activeSubView) {
+                    VaultCategorySubView.CLASS_NOTES -> current.copy(
+                        recentNotesLectureIds = prependRecent(current.recentNotesLectureIds, lec.id),
+                    )
+                    VaultCategorySubView.FLASHCARDS -> current.copy(
+                        recentFlashcardLectureIds = prependRecent(current.recentFlashcardLectureIds, lec.id),
+                    )
+                    VaultCategorySubView.REVISION -> current.copy(
+                        recentRevisionLectureIds = prependRecent(current.recentRevisionLectureIds, lec.id),
+                    )
+                    VaultCategorySubView.HIERARCHY_BROWSE -> current
+                }
+            } else {
+                current
+            }
             state.copy(
-                pwVaultState = current.copy(
+                pwVaultState = updatedRecents.copy(
                     selectedSubjectId = lec?.subjectId ?: current.selectedSubjectId,
                     selectedChapterId = lec?.chapterId ?: current.selectedChapterId,
                     selectedLectureId = lectureId,
-                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
                 ),
             )
         }
@@ -1552,6 +2049,10 @@ class WorkspaceViewModel : ViewModel() {
             state.copy(
                 pwVaultState = current.copy(
                     activeSubView = subView,
+                    // Open category modes at Subject Hierarchy + Recents cleanly
+                    selectedSubjectId = null,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
                     expandedFlashcardChapterId = defaultChapterId,
                     selectedRevisionSubjectId = defaultRevSubjectId,
                 ),
@@ -1561,10 +2062,12 @@ class WorkspaceViewModel : ViewModel() {
 
     fun toggleExpandedClassNote(lectureId: String) {
         _uiState.update { state ->
-            val current = state.pwVaultState.expandedClassNoteLectureId
+            val current = state.pwVaultState
+            val nextExpanded = if (current.expandedClassNoteLectureId == lectureId) null else lectureId
             state.copy(
-                pwVaultState = state.pwVaultState.copy(
-                    expandedClassNoteLectureId = if (current == lectureId) null else lectureId,
+                pwVaultState = current.copy(
+                    expandedClassNoteLectureId = nextExpanded,
+                    recentNotesLectureIds = prependRecent(current.recentNotesLectureIds, lectureId),
                 ),
             )
         }
@@ -1583,10 +2086,19 @@ class WorkspaceViewModel : ViewModel() {
 
     fun selectPreviewFlashcard(cardId: String?) {
         _uiState.update { state ->
+            val current = state.pwVaultState
+            val owningLectureId = current.allLecturesInBatch.firstOrNull { lec ->
+                lec.flashcardDeck.any { it.id == cardId }
+            }?.id
             state.copy(
-                pwVaultState = state.pwVaultState.copy(
+                pwVaultState = current.copy(
                     previewFlashcardId = cardId,
                     isPreviewCardFlipped = false,
+                    recentFlashcardLectureIds = if (owningLectureId != null) {
+                        prependRecent(current.recentFlashcardLectureIds, owningLectureId)
+                    } else {
+                        current.recentFlashcardLectureIds
+                    },
                 ),
             )
         }
@@ -1672,22 +2184,30 @@ class WorkspaceViewModel : ViewModel() {
         targetSubView: VaultCategorySubView,
     ) {
         _uiState.update { state ->
+            val current = state.pwVaultState
             state.copy(
-                pwVaultState = state.pwVaultState.copy(
+                pwVaultState = current.copy(
                     isCommandPaletteOpen = false,
                     selectedBatchId = lecture.batchId,
                     selectedSubjectId = lecture.subjectId,
                     selectedChapterId = lecture.chapterId,
                     selectedLectureId = lecture.id,
                     activeSubView = targetSubView,
-                    expandedClassNoteLectureId = if (targetSubView == VaultCategorySubView.CLASS_NOTES) lecture.id else state.pwVaultState.expandedClassNoteLectureId,
-                    expandedFlashcardChapterId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.chapterId else state.pwVaultState.expandedFlashcardChapterId,
-                    previewFlashcardId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.flashcardDeck.firstOrNull()?.id else state.pwVaultState.previewFlashcardId,
+                    expandedClassNoteLectureId = if (targetSubView == VaultCategorySubView.CLASS_NOTES) lecture.id else current.expandedClassNoteLectureId,
+                    expandedFlashcardChapterId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.chapterId else current.expandedFlashcardChapterId,
+                    previewFlashcardId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.flashcardDeck.firstOrNull()?.id else current.previewFlashcardId,
                     isPreviewCardFlipped = false,
-                    selectedRevisionSubjectId = if (targetSubView == VaultCategorySubView.REVISION) lecture.subjectId else state.pwVaultState.selectedRevisionSubjectId,
+                    selectedRevisionSubjectId = if (targetSubView == VaultCategorySubView.REVISION) lecture.subjectId else current.selectedRevisionSubjectId,
+                    recentNotesLectureIds = if (targetSubView == VaultCategorySubView.CLASS_NOTES) prependRecent(current.recentNotesLectureIds, lecture.id) else current.recentNotesLectureIds,
+                    recentFlashcardLectureIds = if (targetSubView == VaultCategorySubView.FLASHCARDS) prependRecent(current.recentFlashcardLectureIds, lecture.id) else current.recentFlashcardLectureIds,
+                    recentRevisionLectureIds = if (targetSubView == VaultCategorySubView.REVISION) prependRecent(current.recentRevisionLectureIds, lecture.id) else current.recentRevisionLectureIds,
                 ),
             )
         }
+    }
+
+    private fun prependRecent(existing: List<String>, id: String): List<String> {
+        return (listOf(id) + existing.filterNot { it == id }).take(6)
     }
 
     // --- Layered Back Navigation ---
@@ -1698,18 +2218,20 @@ class WorkspaceViewModel : ViewModel() {
                 state.homeCommandState.activeDailyPage != null ->
                     state.copy(homeCommandState = state.homeCommandState.copy(activeDailyPage = null, isActiveFlashcardFlipped = false))
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
+                state.activeTab == WorkspaceTab.BATCHES && state.batchesState.activeCrudDialog != null ->
+                    state.copy(batchesState = state.batchesState.copy(activeCrudDialog = null))
                 state.activeTab == WorkspaceTab.BATCHES && state.batchesState.isBuilderOpen ->
                     state.copy(batchesState = state.batchesState.copy(isBuilderOpen = false))
                 state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.isCommandPaletteOpen ->
                     state.copy(pwVaultState = state.pwVaultState.copy(isCommandPaletteOpen = false))
-                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.activeSubView != VaultCategorySubView.HIERARCHY_BROWSE ->
-                    state.copy(pwVaultState = state.pwVaultState.copy(activeSubView = VaultCategorySubView.HIERARCHY_BROWSE))
                 state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedLectureId != null ->
                     state.copy(pwVaultState = state.pwVaultState.copy(selectedLectureId = null))
                 state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedChapterId != null ->
                     state.copy(pwVaultState = state.pwVaultState.copy(selectedChapterId = null))
                 state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedSubjectId != null ->
                     state.copy(pwVaultState = state.pwVaultState.copy(selectedSubjectId = null))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.activeSubView != VaultCategorySubView.HIERARCHY_BROWSE ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(activeSubView = VaultCategorySubView.HIERARCHY_BROWSE))
                 state.activeTab != WorkspaceTab.HOME -> state.copy(activeTab = WorkspaceTab.HOME)
                 else -> state
             }
@@ -1919,12 +2441,19 @@ class WorkspaceViewModel : ViewModel() {
             ),
         )
 
-        val initialBatches = Phase12MockData.createInitialBatches()
+        val initialPwSubjectsByBatch = Phase161MockData.createPwVaultSubjectsByBatch()
+        val initialBatches = Phase12MockData.createInitialBatches().map { baseBatch ->
+            val vaultSubjects = initialPwSubjectsByBatch[baseBatch.id]
+            if (vaultSubjects != null) {
+                baseBatch.copy(subjects = buildBatchSubjectsFromVault(vaultSubjects))
+            } else {
+                baseBatch
+            }
+        }
         val firstBatch = initialBatches.first()
         val initialRevisionSheets = Phase13MockData.createRevisionSheets()
         val initialQuizQuestions = Phase13MockData.createQuizQuestions()
         val defaultQuizSubject = Phase13MockData.SUBJECT_PHYSICS_ID
-        val initialPwSubjectsByBatch = Phase161MockData.createPwVaultSubjectsByBatch()
         val firstPwSubject = initialPwSubjectsByBatch[firstBatch.id]?.firstOrNull()
         val firstPwChapter = firstPwSubject?.chapters?.firstOrNull()
 
@@ -1950,6 +2479,7 @@ class WorkspaceViewModel : ViewModel() {
                 batches = initialBatches,
                 selectedBatchId = firstBatch.id,
                 expandedSubjectId = firstBatch.subjects.firstOrNull()?.id,
+                expandedChapterId = firstBatch.subjects.firstOrNull()?.chapters?.firstOrNull()?.id,
                 isBuilderOpen = false,
             ),
             vaultState = VaultUiState(
@@ -1962,6 +2492,9 @@ class WorkspaceViewModel : ViewModel() {
                 expandedFlashcardChapterId = firstPwChapter?.id,
                 previewFlashcardId = firstPwChapter?.lectures?.firstOrNull()?.flashcardDeck?.firstOrNull()?.id,
                 selectedRevisionSubjectId = firstPwSubject?.id,
+                recentNotesLectureIds = listOf("lec_phys_04", "lec_chem_03"),
+                recentFlashcardLectureIds = listOf("lec_phys_04", "lec_chem_03"),
+                recentRevisionLectureIds = listOf("lec_phys_04", "lec_chem_03"),
             ),
             revisionQuizState = RevisionQuizUiState(
                 activeMode = RevisionQuizTabMode.REVISION_NOTES,

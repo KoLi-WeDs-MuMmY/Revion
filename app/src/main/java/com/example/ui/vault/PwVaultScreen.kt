@@ -10,7 +10,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -39,23 +41,32 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FolderCopy
-import androidx.compose.material.icons.rounded.PlayCircleOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +93,8 @@ import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
+import com.example.ui.theme.rememberScreenLayoutMetrics
+import kotlinx.coroutines.delay
 
 @Composable
 fun PwVaultScreen(
@@ -94,10 +107,8 @@ fun PwVaultScreen(
     onSelectLecture: (String?) -> Unit,
     onSelectSubView: (VaultCategorySubView) -> Unit,
     onToggleExpandClassNote: (String) -> Unit,
-    onToggleExpandFlashcardChapter: (String) -> Unit,
     onSelectPreviewFlashcard: (String) -> Unit,
     onFlipPreviewFlashcard: () -> Unit,
-    onSelectRevisionSubject: (String) -> Unit,
     onOpenCommandPalette: (VaultPaletteFocus) -> Unit,
     onCloseCommandPalette: () -> Unit,
     onUpdatePaletteQuery: (String) -> Unit,
@@ -108,6 +119,18 @@ fun PwVaultScreen(
     modifier: Modifier = Modifier,
 ) {
     val activeBatch = batches.firstOrNull { it.id == state.selectedBatchId } ?: batches.first()
+    val metrics = rememberScreenLayoutMetrics()
+    val tokens = GhickinTokens.colors
+
+    // Calm dismissible banner state for "Play Lecture" (upcoming in next updates)
+    var upcomingPlayLectureTitle by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(upcomingPlayLectureTitle) {
+        if (upcomingPlayLectureTitle != null) {
+            delay(3600L)
+            upcomingPlayLectureTitle = null
+        }
+    }
 
     Box(
         modifier = modifier
@@ -118,14 +141,14 @@ fun PwVaultScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 1320.dp)
+                .widthIn(max = metrics.maxContentWidth)
                 .padding(
-                    horizontal = if (isWideLayout) 26.dp else 16.dp,
-                    vertical = if (isWideLayout) 20.dp else 14.dp,
+                    horizontal = metrics.horizontalPadding,
+                    vertical = metrics.verticalPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // 1. Clean Top Bar — NO inline search bars or multi-row filter chip clutter
+            // 1. Clean Top Bar — Search & Filter strictly behind icon buttons
             VaultCleanTopBar(
                 activeBatch = activeBatch,
                 hasMultipleBatches = batches.size > 1,
@@ -135,7 +158,7 @@ fun PwVaultScreen(
                 onOpenFilter = { onOpenCommandPalette(VaultPaletteFocus.FILTER) },
             )
 
-            // 2. Collapsible PW-Style Breadcrumb Trail + Morphing Category Mode Strip
+            // 2. Collapsible PW-Style Breadcrumb Trail + Category Mode Switcher
             if (isWideLayout) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -146,7 +169,7 @@ fun PwVaultScreen(
                         batchName = activeBatch.name,
                         subject = state.selectedSubject,
                         chapter = state.selectedChapter,
-                        lecture = state.selectedLecture,
+                        lecture = if (state.activeSubView == VaultCategorySubView.HIERARCHY_BROWSE) state.selectedLecture else null,
                         onResetToBatch = { onSelectSubject(null) },
                         onSelectSubjectCrumb = { onSelectSubject(state.selectedSubjectId) },
                         onSelectChapterCrumb = { onSelectChapter(state.selectedChapterId) },
@@ -164,7 +187,7 @@ fun PwVaultScreen(
                         batchName = activeBatch.name,
                         subject = state.selectedSubject,
                         chapter = state.selectedChapter,
-                        lecture = state.selectedLecture,
+                        lecture = if (state.activeSubView == VaultCategorySubView.HIERARCHY_BROWSE) state.selectedLecture else null,
                         onResetToBatch = { onSelectSubject(null) },
                         onSelectSubjectCrumb = { onSelectSubject(state.selectedSubjectId) },
                         onSelectChapterCrumb = { onSelectChapter(state.selectedChapterId) },
@@ -176,15 +199,15 @@ fun PwVaultScreen(
                 }
             }
 
-            // 3. Collapsible / Morphing Stage Transition between Hierarchy & Distinct Sub-Views
+            // 3. Stage Content across Browse + Category Subject-Hierarchy Modes
             AnimatedContent(
                 targetState = state.activeSubView,
                 transitionSpec = {
-                    (fadeIn(tween(220)) + scaleIn(
-                        initialScale = 0.97f,
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
-                    )) togetherWith (fadeOut(tween(150)) + scaleOut(
-                        targetScale = 0.98f,
+                    (fadeIn(tween(210)) + scaleIn(
+                        initialScale = 0.975f,
+                        animationSpec = spring(dampingRatio = 0.86f, stiffness = 400f),
+                    )) togetherWith (fadeOut(tween(140)) + scaleOut(
+                        targetScale = 0.985f,
                         animationSpec = spring(dampingRatio = 0.9f, stiffness = 440f),
                     ))
                 },
@@ -194,10 +217,10 @@ fun PwVaultScreen(
                 when (subView) {
                     VaultCategorySubView.HIERARCHY_BROWSE -> VaultHierarchyBrowser(
                         state = state,
-                        isWideLayout = isWideLayout,
                         onSelectSubject = { onSelectSubject(it) },
                         onSelectChapter = { onSelectChapter(it) },
                         onSelectLecture = { onSelectLecture(it) },
+                        onPlayLectureClick = { lecture -> upcomingPlayLectureTitle = lecture.title },
                         onOpenLectureSubView = { lecture, target ->
                             onJumpToLectureFromPalette(lecture, target)
                         },
@@ -205,21 +228,93 @@ fun PwVaultScreen(
 
                     VaultCategorySubView.CLASS_NOTES -> VaultClassNotesSubView(
                         state = state,
+                        onSelectSubject = { onSelectSubject(it) },
+                        onSelectChapter = { onSelectChapter(it) },
+                        onOpenRecentLecture = { lec ->
+                            onJumpToLectureFromPalette(lec, VaultCategorySubView.CLASS_NOTES)
+                        },
                         onToggleExpandNote = onToggleExpandClassNote,
                     )
 
                     VaultCategorySubView.FLASHCARDS -> VaultFlashcardsSubView(
                         state = state,
                         isWideLayout = isWideLayout,
-                        onToggleChapter = onToggleExpandFlashcardChapter,
+                        onSelectSubject = { onSelectSubject(it) },
+                        onSelectChapter = { onSelectChapter(it) },
+                        onOpenRecentLecture = { lec ->
+                            onJumpToLectureFromPalette(lec, VaultCategorySubView.FLASHCARDS)
+                        },
                         onSelectPreviewCard = onSelectPreviewFlashcard,
                         onFlipPreviewCard = onFlipPreviewFlashcard,
                     )
 
                     VaultCategorySubView.REVISION -> VaultRevisionSubView(
                         state = state,
-                        onSelectRevisionSubject = onSelectRevisionSubject,
+                        onSelectSubject = { onSelectSubject(it) },
+                        onSelectChapter = { onSelectChapter(it) },
+                        onOpenRecentLecture = { lec ->
+                            onJumpToLectureFromPalette(lec, VaultCategorySubView.REVISION)
+                        },
                     )
+                }
+            }
+        }
+
+        // Calm dismissible banner when tapping "Play Lecture"
+        androidx.compose.animation.AnimatedVisibility(
+            visible = upcomingPlayLectureTitle != null,
+            enter = fadeIn(tween(180)) + slideInVertically(spring(0.85f, 400f)) { it / 2 },
+            exit = fadeOut(tween(150)) + slideOutVertically(spring(0.9f, 420f)) { it / 2 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = tokens.slateElevated,
+                border = BorderStroke(1.dp, tokens.inkPrimary.copy(alpha = 0.22f)),
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .testTag("vault_play_lecture_upcoming_banner"),
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = tokens.inkPrimary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.vault_play_lecture_upcoming_notice),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = tokens.inkPrimary,
+                        )
+                        upcomingPlayLectureTitle?.let { title ->
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.inkSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { upcomingPlayLectureTitle = null },
+                        modifier = Modifier.testTag("vault_play_notice_dismiss"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Dismiss notice",
+                            tint = tokens.inkMuted,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }
@@ -247,8 +342,7 @@ private fun VaultCleanTopBar(
     onOpenFilter: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
-    val batchAccent = activeBatch.accentMood.accent
+    val batchDot = activeBatch.accentMood.accent
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -270,7 +364,7 @@ private fun VaultCleanTopBar(
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = tokens.obsidianSurface,
-                    border = BorderStroke(1.dp, batchAccent.copy(alpha = 0.36f)),
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
                     modifier = Modifier
                         .testTag("vault_batch_switcher_pill")
                         .tactileScale(batchInteraction, 0.96f)
@@ -278,7 +372,7 @@ private fun VaultCleanTopBar(
                         .clickable(
                             enabled = hasMultipleBatches,
                             interactionSource = batchInteraction,
-                            indication = ripple(color = batchAccent.copy(alpha = 0.16f)),
+                            indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
                             role = Role.Button,
                             onClick = onCycleBatch,
                         ),
@@ -290,9 +384,9 @@ private fun VaultCleanTopBar(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(6.dp)
                                 .clip(CircleShape)
-                                .background(batchAccent),
+                                .background(batchDot),
                         )
                         Text(
                             text = activeBatch.name,
@@ -319,7 +413,7 @@ private fun VaultCleanTopBar(
             )
         }
 
-        // Strictly two clean icon buttons triggering the Expandable Command Palette
+        // Two clean monochrome icon buttons for Search & Filter Command Palette
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -328,7 +422,6 @@ private fun VaultCleanTopBar(
                 icon = Icons.Rounded.Search,
                 contentDesc = stringResource(R.string.vault_icon_search_desc),
                 showActiveDot = false,
-                dotColor = primary,
                 testTag = "vault_open_search_palette",
                 onClick = onOpenSearch,
             )
@@ -336,7 +429,6 @@ private fun VaultCleanTopBar(
                 icon = Icons.Rounded.Tune,
                 contentDesc = stringResource(R.string.vault_icon_filter_desc),
                 showActiveDot = hasActiveFilter,
-                dotColor = primary,
                 testTag = "vault_open_filter_palette",
                 onClick = onOpenFilter,
             )
@@ -349,7 +441,6 @@ private fun VaultTopIconButton(
     icon: ImageVector,
     contentDesc: String,
     showActiveDot: Boolean,
-    dotColor: Color,
     testTag: String,
     onClick: () -> Unit,
 ) {
@@ -366,7 +457,7 @@ private fun VaultTopIconButton(
             .background(tokens.obsidianSurface)
             .clickable(
                 interactionSource = interaction,
-                indication = ripple(color = dotColor.copy(alpha = 0.18f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.16f)),
                 role = Role.Button,
                 onClick = onClick,
             ),
@@ -374,14 +465,17 @@ private fun VaultTopIconButton(
         Surface(
             shape = CircleShape,
             color = Color.Transparent,
-            border = BorderStroke(1.dp, if (showActiveDot) dotColor.copy(alpha = 0.45f) else tokens.hairlineRest),
+            border = BorderStroke(
+                1.dp,
+                if (showActiveDot) tokens.inkPrimary.copy(alpha = 0.45f) else tokens.hairlineRest,
+            ),
             modifier = Modifier.fillMaxSize(),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = icon,
                     contentDescription = contentDesc,
-                    tint = if (showActiveDot) dotColor else tokens.inkPrimary,
+                    tint = tokens.inkPrimary,
                     modifier = Modifier.size(20.dp),
                 )
                 if (showActiveDot) {
@@ -389,9 +483,9 @@ private fun VaultTopIconButton(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                            .size(7.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
-                            .background(dotColor),
+                            .background(tokens.inkPrimary),
                     )
                 }
             }
@@ -410,8 +504,6 @@ private fun CollapsibleVaultBreadcrumbs(
     onSelectChapterCrumb: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tokens = GhickinTokens.colors
-
     Row(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
@@ -423,7 +515,7 @@ private fun CollapsibleVaultBreadcrumbs(
         BreadcrumbChip(
             text = batchName,
             isTerminal = subject == null,
-            accentColor = MaterialTheme.colorScheme.primary,
+            dotColor = null,
             onClick = onResetToBatch,
         )
 
@@ -432,7 +524,7 @@ private fun CollapsibleVaultBreadcrumbs(
             BreadcrumbChip(
                 text = subject.name,
                 isTerminal = chapter == null,
-                accentColor = subject.accentMood.accent,
+                dotColor = subject.accentMood.accent,
                 onClick = onSelectSubjectCrumb,
             )
         }
@@ -442,7 +534,7 @@ private fun CollapsibleVaultBreadcrumbs(
             BreadcrumbChip(
                 text = "${chapter.chapterCode} · ${chapter.title}",
                 isTerminal = lecture == null,
-                accentColor = chapter.subjectMood.accent,
+                dotColor = null,
                 onClick = onSelectChapterCrumb,
             )
         }
@@ -452,7 +544,7 @@ private fun CollapsibleVaultBreadcrumbs(
             BreadcrumbChip(
                 text = lecture.lectureCode,
                 isTerminal = true,
-                accentColor = lecture.subjectMood.accent,
+                dotColor = null,
                 onClick = {},
             )
         }
@@ -473,7 +565,7 @@ private fun BreadcrumbChevron() {
 private fun BreadcrumbChip(
     text: String,
     isTerminal: Boolean,
-    accentColor: Color,
+    dotColor: Color?,
     onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
@@ -483,7 +575,7 @@ private fun BreadcrumbChip(
         color = if (isTerminal) tokens.slateElevated else tokens.obsidianSurface,
         border = BorderStroke(
             1.dp,
-            if (isTerminal) accentColor.copy(alpha = 0.36f) else tokens.hairlineSubtle,
+            if (isTerminal) tokens.inkPrimary.copy(alpha = 0.24f) else tokens.hairlineSubtle,
         ),
         modifier = Modifier
             .tactileScale(interaction, 0.96f)
@@ -491,19 +583,32 @@ private fun BreadcrumbChip(
             .clickable(
                 enabled = !isTerminal,
                 interactionSource = interaction,
-                indication = ripple(color = accentColor.copy(alpha = 0.14f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
                 role = Role.Button,
                 onClick = onClick,
             ),
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isTerminal) tokens.inkPrimary else tokens.inkSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (dotColor != null) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(dotColor),
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isTerminal) tokens.inkPrimary else tokens.inkSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -513,7 +618,6 @@ private fun VaultCategoryMorphSwitcher(
     onSelectSubView: (VaultCategorySubView) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
 
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -531,21 +635,21 @@ private fun VaultCategoryMorphSwitcher(
                 val selected = mode == activeSubView
                 val interaction = remember { MutableInteractionSource() }
                 val bg by animateColorAsState(
-                    targetValue = if (selected) tokens.slateElevated else Color.Transparent,
+                    targetValue = if (selected) tokens.primaryCta else Color.Transparent,
                     animationSpec = spring(stiffness = 420f),
                     label = "vaultCatBg_${mode.name}",
                 )
+                val ink = if (selected) tokens.onPrimaryCta else tokens.inkSecondary
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = bg,
-                    border = if (selected) BorderStroke(1.dp, primary.copy(alpha = 0.36f)) else null,
                     modifier = Modifier
                         .testTag("vault_mode_${mode.name.lowercase()}")
                         .tactileScale(interaction, 0.96f)
                         .clip(RoundedCornerShape(10.dp))
                         .clickable(
                             interactionSource = interaction,
-                            indication = ripple(color = primary.copy(alpha = 0.16f)),
+                            indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
                             role = Role.Tab,
                             onClick = { onSelectSubView(mode) },
                         ),
@@ -553,7 +657,7 @@ private fun VaultCategoryMorphSwitcher(
                     Text(
                         text = mode.label,
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (selected) tokens.inkPrimary else tokens.inkMuted,
+                        color = ink,
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
                     )
                 }
@@ -571,10 +675,10 @@ private enum class VaultHierarchyDepth {
 @Composable
 private fun VaultHierarchyBrowser(
     state: PwVaultUiState,
-    isWideLayout: Boolean,
     onSelectSubject: (String) -> Unit,
     onSelectChapter: (String) -> Unit,
     onSelectLecture: (String) -> Unit,
+    onPlayLectureClick: (VaultLectureNode) -> Unit,
     onOpenLectureSubView: (VaultLectureNode, VaultCategorySubView) -> Unit,
 ) {
     val depth = when {
@@ -596,19 +700,19 @@ private fun VaultHierarchyBrowser(
         when (activeDepth) {
             VaultHierarchyDepth.SUBJECTS -> VaultSubjectGrid(
                 subjects = state.subjectsForSelectedBatch,
-                isWideLayout = isWideLayout,
                 onSelectSubject = onSelectSubject,
             )
 
-            VaultHierarchyDepth.CHAPTERS -> VaultChapterList(
+            VaultHierarchyDepth.CHAPTERS -> VaultChapterGrid(
                 subject = state.selectedSubject ?: return@AnimatedContent,
                 onSelectChapter = onSelectChapter,
             )
 
-            VaultHierarchyDepth.LECTURES -> VaultLectureList(
+            VaultHierarchyDepth.LECTURES -> VaultPwLectureStream(
                 chapter = state.selectedChapter ?: return@AnimatedContent,
                 selectedLectureId = state.selectedLectureId,
                 onSelectLecture = onSelectLecture,
+                onPlayLectureClick = onPlayLectureClick,
                 onOpenLectureSubView = onOpenLectureSubView,
             )
         }
@@ -618,10 +722,12 @@ private fun VaultHierarchyBrowser(
 @Composable
 private fun VaultSubjectGrid(
     subjects: List<VaultSubjectNode>,
-    isWideLayout: Boolean,
     onSelectSubject: (String) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
+    val columns = metrics.vaultSubjectColumns.coerceAtLeast(1)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -631,42 +737,31 @@ private fun VaultSubjectGrid(
     ) {
         item(key = "vault_subjects_heading") {
             Text(
-                text = "SELECT A SUBJECT TO EXPAND CHAPTERS & LECTURES",
+                text = "SELECT A SUBJECT TO BROWSE CHAPTERS & LECTURES",
                 style = MicroTagMono,
                 color = tokens.inkMuted,
             )
         }
 
-        if (isWideLayout) {
-            val rows = subjects.chunked(3)
-            itemsIndexed(rows) { rIdx, rowSubjects ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    rowSubjects.forEachIndexed { cIdx, subject ->
-                        StaggeredEntrance(
-                            delayMillis = 40L * (rIdx * 3 + cIdx),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            MorphingSubjectCard(
-                                subject = subject,
-                                onClick = { onSelectSubject(subject.id) },
-                            )
-                        }
-                    }
-                    repeat(3 - rowSubjects.size) {
-                        Spacer(modifier = Modifier.weight(1f))
+        val rows = subjects.chunked(columns)
+        itemsIndexed(rows) { rIdx, rowSubjects ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                rowSubjects.forEachIndexed { cIdx, subject ->
+                    StaggeredEntrance(
+                        delayMillis = 35L * (rIdx * columns + cIdx),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        MorphingSubjectCard(
+                            subject = subject,
+                            onClick = { onSelectSubject(subject.id) },
+                        )
                     }
                 }
-            }
-        } else {
-            itemsIndexed(subjects, key = { _, s -> s.id }) { idx, subject ->
-                StaggeredEntrance(delayMillis = 40L * idx) {
-                    MorphingSubjectCard(
-                        subject = subject,
-                        onClick = { onSelectSubject(subject.id) },
-                    )
+                repeat(columns - rowSubjects.size) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -679,7 +774,7 @@ private fun MorphingSubjectCard(
     onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = subject.accentMood.accent
+    val dotAccent = subject.accentMood.accent
     val pct = if (subject.totalLectures == 0) 0 else (subject.completedLectures * 100) / subject.totalLectures
 
     ObsidianCard(
@@ -687,9 +782,7 @@ private fun MorphingSubjectCard(
             .fillMaxWidth()
             .testTag("vault_subject_card_${subject.id}"),
         containerColor = tokens.obsidianSurface,
-        accentEdgeColor = accent.copy(alpha = 0.34f),
-        surfaceWashColor = accent.copy(alpha = 0.05f),
-        cornerRadius = 20.dp,
+        cornerRadius = 18.dp,
         contentPadding = PaddingValues(18.dp),
         onClick = onClick,
     ) {
@@ -709,15 +802,26 @@ private fun MorphingSubjectCard(
                     Icon(
                         imageVector = Icons.Rounded.FolderCopy,
                         contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(20.dp),
+                        tint = tokens.inkPrimary,
+                        modifier = Modifier.size(19.dp),
                     )
                 }
-                Text(
-                    text = "${subject.chapters.size} CH · ${subject.totalLectures} LEC",
-                    style = MicroTagMono,
-                    color = tokens.inkMuted,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(dotAccent),
+                    )
+                    Text(
+                        text = "${subject.chapters.size} CH · ${subject.totalLectures} LEC",
+                        style = MicroTagMono,
+                        color = tokens.inkMuted,
+                    )
+                }
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -735,95 +839,75 @@ private fun MorphingSubjectCard(
 
             AnimatedLinearProgressBar(
                 progressPercent = pct,
-                accentColor = accent,
-                height = 5.dp,
+                accentColor = dotAccent,
+                height = 4.dp,
             )
         }
     }
 }
 
+/**
+ * Upgraded Materialized PW-Style Chapters Grid (2 columns on 16:9, 1 column on 9:16).
+ */
 @Composable
-private fun VaultChapterList(
+private fun VaultChapterGrid(
     subject: VaultSubjectNode,
     onSelectChapter: (String) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = subject.accentMood.accent
+    val metrics = rememberScreenLayoutMetrics()
+    val columns = metrics.vaultChapterColumns.coerceAtLeast(1)
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("vault_chapters_list"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 18.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
     ) {
         item(key = "vault_chapters_heading") {
-            Text(
-                text = "${subject.name.uppercase()} CHAPTERS · TAP TO OPEN LECTURES",
-                style = MicroTagMono,
-                color = tokens.inkMuted,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "${subject.name.uppercase()} CHAPTERS · ${subject.chapters.size} MODULES",
+                    style = MicroTagMono,
+                    color = tokens.inkMuted,
+                )
+                Text(
+                    text = "Tap any chapter to view PW lecture cards",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.inkSecondary,
+                )
+            }
         }
 
-        itemsIndexed(subject.chapters, key = { _, ch -> ch.id }) { idx, chapter ->
-            val pct = if (chapter.lectures.isEmpty()) 0 else (chapter.completedLectures * 100) / chapter.lectures.size
-            StaggeredEntrance(delayMillis = 40L * idx) {
-                ObsidianCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("vault_chapter_card_${chapter.id}"),
-                    containerColor = tokens.obsidianSurface,
-                    accentEdgeColor = accent.copy(alpha = 0.30f),
-                    cornerRadius = 18.dp,
-                    contentPadding = PaddingValues(18.dp),
-                    onClick = { onSelectChapter(chapter.id) },
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        val rows = subject.chapters.chunked(columns)
+        itemsIndexed(rows) { rIdx, rowChapters ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                rowChapters.forEachIndexed { cIdx, chapter ->
+                    val number = rIdx * columns + cIdx + 1
+                    val pct = if (chapter.lectures.isEmpty()) 0 else (chapter.completedLectures * 100) / chapter.lectures.size
+
+                    StaggeredEntrance(
+                        delayMillis = 35L * (rIdx * columns + cIdx),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = tokens.carbonSurface,
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.34f)),
-                        ) {
-                            Text(
-                                text = chapter.chapterCode,
-                                style = MonoBadgeStyle,
-                                color = accent,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            Text(
-                                text = chapter.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = tokens.inkPrimary,
-                            )
-                            Text(
-                                text = "${chapter.lectures.size} Lectures · ${chapter.totalFlashcards} Flashcards · Notes & Revision Ready",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = tokens.inkSecondary,
-                            )
-                            AnimatedLinearProgressBar(
-                                progressPercent = pct,
-                                accentColor = accent,
-                                height = 4.dp,
-                            )
-                        }
-
-                        Icon(
-                            imageVector = Icons.Rounded.ChevronRight,
-                            contentDescription = "Open chapter",
-                            tint = tokens.inkSecondary,
-                            modifier = Modifier.size(22.dp),
+                        PwMaterializedChapterCard(
+                            chapterNumber = number,
+                            chapter = chapter,
+                            progressPercent = pct,
+                            onClick = { onSelectChapter(chapter.id) },
                         )
                     }
+                }
+                repeat(columns - rowChapters.size) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -831,204 +915,474 @@ private fun VaultChapterList(
 }
 
 @Composable
-private fun VaultLectureList(
+private fun PwMaterializedChapterCard(
+    chapterNumber: Int,
+    chapter: VaultChapterNode,
+    progressPercent: Int,
+    onClick: () -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val dotAccent = chapter.subjectMood.accent
+
+    ObsidianCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("vault_chapter_card_${chapter.id}"),
+        containerColor = tokens.obsidianSurface,
+        cornerRadius = 18.dp,
+        contentPadding = PaddingValues(18.dp),
+        onClick = onClick,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Top bar: PW numbered chapter plate + subtle dot + completion %
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(9.dp),
+                        color = tokens.carbonSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                    ) {
+                        Text(
+                            text = chapterNumber.toString().padStart(2, '0'),
+                            style = MonoBadgeStyle,
+                            color = tokens.inkPrimary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(dotAccent),
+                    )
+                    Text(
+                        text = chapter.chapterCode,
+                        style = MicroTagMono,
+                        color = tokens.inkMuted,
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "$progressPercent%",
+                        style = MonoBadgeStyle,
+                        color = tokens.inkSecondary,
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = "Open chapter",
+                        tint = tokens.inkMuted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Chapter Title
+            Text(
+                text = chapter.title,
+                style = MaterialTheme.typography.titleLarge,
+                color = tokens.inkPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            // Materialized pill stats row (Lectures · Notes · Flashcards)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PwMetaPill(text = "${chapter.lectures.size} Lectures")
+                PwMetaPill(text = "${chapter.lectures.size} Notes")
+                PwMetaPill(text = "${chapter.totalFlashcards} Cards")
+            }
+
+            AnimatedLinearProgressBar(
+                progressPercent = progressPercent,
+                accentColor = dotAccent,
+                height = 4.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PwMetaPill(text: String) {
+    val tokens = GhickinTokens.colors
+    Surface(
+        shape = RoundedCornerShape(7.dp),
+        color = tokens.carbonSurface,
+        border = BorderStroke(1.dp, tokens.hairlineSubtle),
+    ) {
+        Text(
+            text = text,
+            style = MicroTagMono,
+            color = tokens.inkSecondary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+/**
+ * Upgraded Materialized PW-Style Lecture Cards:
+ * Stylized lecture thumbnail plate + Grok pure-white "Play Lecture" CTA + "More" dropdown menu
+ * offering Notes, Flashcards, and Revision.
+ */
+@Composable
+private fun VaultPwLectureStream(
     chapter: VaultChapterNode,
     selectedLectureId: String?,
     onSelectLecture: (String) -> Unit,
+    onPlayLectureClick: (VaultLectureNode) -> Unit,
     onOpenLectureSubView: (VaultLectureNode, VaultCategorySubView) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = chapter.subjectMood.accent
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .testTag("vault_lectures_list"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 20.dp),
+        contentPadding = PaddingValues(bottom = 28.dp),
     ) {
         item(key = "vault_lectures_heading") {
-            Text(
-                text = "${chapter.chapterCode} · ${chapter.title.uppercase()} · LECTURE STREAM",
-                style = MicroTagMono,
-                color = tokens.inkMuted,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "${chapter.chapterCode} · ${chapter.title.uppercase()}",
+                    style = MicroTagMono,
+                    color = tokens.inkMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${chapter.lectures.size} LECTURES",
+                    style = MicroTagMono,
+                    color = tokens.inkSecondary,
+                )
+            }
         }
 
         itemsIndexed(chapter.lectures, key = { _, lec -> lec.id }) { idx, lecture ->
-            val expanded = lecture.id == selectedLectureId || (selectedLectureId == null && idx == 0)
-            StaggeredEntrance(delayMillis = 40L * idx) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = tokens.obsidianSurface,
-                    border = BorderStroke(
-                        1.dp,
-                        if (expanded) accent.copy(alpha = 0.42f) else tokens.hairlineRest,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("vault_lecture_card_${lecture.id}")
-                        .animateContentSize(spring(dampingRatio = 0.84f, stiffness = 380f))
-                        .clip(RoundedCornerShape(18.dp))
-                        .clickable { onSelectLecture(lecture.id) },
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(11.dp))
-                                    .background(tokens.carbonSurface),
-                            ) {
-                                Icon(
-                                    imageVector = if (lecture.isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.PlayCircleOutline,
-                                    contentDescription = null,
-                                    tint = if (lecture.isCompleted) AccentMood.EMERALD.accent else accent,
-                                    modifier = Modifier.size(21.dp),
-                                )
-                            }
-
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Text(
-                                        text = "${lecture.lectureCode} · ${lecture.durationLabel} · ${lecture.dateLabel}",
-                                        style = MicroTagMono,
-                                        color = tokens.inkMuted,
-                                    )
-                                    if (lecture.isAutoSavedFromYesterday) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.CloudDone,
-                                            contentDescription = "Auto-Saved",
-                                            tint = AccentMood.EMERALD.accent,
-                                            modifier = Modifier.size(13.dp),
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = lecture.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = tokens.inkPrimary,
-                                )
-                            }
-                        }
-
-                        if (expanded) {
-                            Text(
-                                text = lecture.notesSummary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = tokens.inkSecondary,
-                            )
-
-                            // 3 Direct Morph Buttons into the Lecture's Distinct Sub-Views
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                LectureSubViewActionChip(
-                                    icon = Icons.Rounded.Description,
-                                    label = "Class Notes",
-                                    meta = "${lecture.notesPageCount}p · RAG",
-                                    accent = accent,
-                                    testTag = "vault_lec_open_notes_${lecture.id}",
-                                    onClick = { onOpenLectureSubView(lecture, VaultCategorySubView.CLASS_NOTES) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                LectureSubViewActionChip(
-                                    icon = Icons.Rounded.Style,
-                                    label = "Flashcards",
-                                    meta = "${lecture.flashcardDeck.size} cards",
-                                    accent = AccentMood.AMBER.accent,
-                                    testTag = "vault_lec_open_cards_${lecture.id}",
-                                    onClick = { onOpenLectureSubView(lecture, VaultCategorySubView.FLASHCARDS) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                LectureSubViewActionChip(
-                                    icon = Icons.Rounded.AutoStories,
-                                    label = "Revision",
-                                    meta = "Digest",
-                                    accent = AccentMood.EMERALD.accent,
-                                    testTag = "vault_lec_open_rev_${lecture.id}",
-                                    onClick = { onOpenLectureSubView(lecture, VaultCategorySubView.REVISION) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                    }
-                }
+            val selected = lecture.id == selectedLectureId
+            StaggeredEntrance(delayMillis = 35L * idx) {
+                PwMaterializedLectureCard(
+                    lecture = lecture,
+                    selected = selected,
+                    onClick = { onSelectLecture(lecture.id) },
+                    onPlayClick = { onPlayLectureClick(lecture) },
+                    onOpenNotes = { onOpenLectureSubView(lecture, VaultCategorySubView.CLASS_NOTES) },
+                    onOpenFlashcards = { onOpenLectureSubView(lecture, VaultCategorySubView.FLASHCARDS) },
+                    onOpenRevision = { onOpenLectureSubView(lecture, VaultCategorySubView.REVISION) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LectureSubViewActionChip(
-    icon: ImageVector,
-    label: String,
-    meta: String,
-    accent: Color,
-    testTag: String,
+private fun PwMaterializedLectureCard(
+    lecture: VaultLectureNode,
+    selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    onPlayClick: () -> Unit,
+    onOpenNotes: () -> Unit,
+    onOpenFlashcards: () -> Unit,
+    onOpenRevision: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val interaction = remember { MutableInteractionSource() }
+    val dotAccent = lecture.subjectMood.accent
+    var moreMenuExpanded by remember { mutableStateOf(false) }
+    val playInteraction = remember { MutableInteractionSource() }
+    val moreInteraction = remember { MutableInteractionSource() }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = tokens.carbonSurface,
-        border = BorderStroke(1.dp, tokens.hairlineSubtle),
-        modifier = modifier
-            .testTag(testTag)
-            .minimumInteractiveComponentSize()
-            .tactileScale(interaction, 0.96f)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(
-                interactionSource = interaction,
-                indication = ripple(color = accent.copy(alpha = 0.16f)),
-                role = Role.Button,
-                onClick = onClick,
-            ),
+        shape = RoundedCornerShape(18.dp),
+        color = tokens.obsidianSurface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) tokens.inkPrimary.copy(alpha = 0.28f) else tokens.hairlineRest,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("vault_lecture_card_${lecture.id}")
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(17.dp),
-            )
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = tokens.inkPrimary,
-                    maxLines = 1,
-                )
-                Text(
-                    text = meta,
-                    style = MicroTagMono,
-                    color = tokens.inkMuted,
-                    maxLines = 1,
-                )
+            // Top PW Lecture Row: Stylized Thumbnail Plate + Metadata & Title
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // Stylized PW Lecture Thumbnail Plate
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = tokens.carbonSurface,
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
+                    modifier = Modifier
+                        .width(96.dp)
+                        .height(64.dp),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Subtle top-left lecture code
+                        Text(
+                            text = lecture.lectureCode,
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(start = 8.dp, top = 6.dp),
+                        )
+                        // Center play glyph
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .align(Alignment.Center)
+                                .clip(CircleShape)
+                                .background(tokens.slateElevated),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.PlayArrow,
+                                contentDescription = null,
+                                tint = tokens.inkPrimary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        // Bottom-right duration pill
+                        Text(
+                            text = lecture.durationLabel,
+                            style = MicroTagMono,
+                            color = tokens.inkSecondary,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 7.dp, bottom = 5.dp),
+                        )
+                        // Top-right completion check or subject dot
+                        if (lecture.isCompleted) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = "Completed",
+                                tint = AccentMood.EMERALD.accent,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(13.dp),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(dotAccent),
+                            )
+                        }
+                    }
+                }
+
+                // Lecture title, subtitle & auto-saved indicator
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "${lecture.subjectName.uppercase()} · ${lecture.dateLabel}",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (lecture.isAutoSavedFromYesterday) {
+                            Icon(
+                                imageVector = Icons.Rounded.CloudDone,
+                                contentDescription = "Auto-Saved",
+                                tint = AccentMood.EMERALD.accent,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        text = lecture.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = tokens.inkPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "${lecture.notesPageCount}p Notes · ${lecture.flashcardDeck.size} Flashcards · Revision Sheet",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.inkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            // Bottom PW Action Row: Pure Monochrome White "Play Lecture" CTA + Anchored "More" Menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // Grok pure-white primary Play Lecture button
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = tokens.primaryCta,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("vault_play_lecture_${lecture.id}")
+                        .minimumInteractiveComponentSize()
+                        .tactileScale(playInteraction, 0.97f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = playInteraction,
+                            indication = ripple(color = tokens.onPrimaryCta.copy(alpha = 0.2f)),
+                            role = Role.Button,
+                            onClick = onPlayClick,
+                        ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint = tokens.onPrimaryCta,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.vault_play_lecture_cta),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = tokens.onPrimaryCta,
+                        )
+                    }
+                }
+
+                // Anchored "More" button opening Class Notes / Flashcards / Revision menu
+                Box {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = tokens.carbonSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                        modifier = Modifier
+                            .testTag("vault_lecture_more_${lecture.id}")
+                            .minimumInteractiveComponentSize()
+                            .tactileScale(moreInteraction, 0.95f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(
+                                interactionSource = moreInteraction,
+                                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
+                                role = Role.Button,
+                                onClick = { moreMenuExpanded = true },
+                            ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.vault_more_options_cta),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = tokens.inkPrimary,
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "More study resources for ${lecture.title}",
+                                tint = tokens.inkSecondary,
+                                modifier = Modifier.size(17.dp),
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = moreMenuExpanded,
+                        onDismissRequest = { moreMenuExpanded = false },
+                        containerColor = tokens.carbonSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text("Class Notes", style = MaterialTheme.typography.labelLarge, color = tokens.inkPrimary)
+                                    Text("${lecture.notesPageCount} pages · RAG Ready", style = MicroTagMono, color = tokens.inkMuted)
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.Description, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                            },
+                            modifier = Modifier.testTag("vault_more_notes_${lecture.id}"),
+                            onClick = {
+                                moreMenuExpanded = false
+                                onOpenNotes()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text("Flashcards", style = MaterialTheme.typography.labelLarge, color = tokens.inkPrimary)
+                                    Text("${lecture.flashcardDeck.size} active recall cards", style = MicroTagMono, color = tokens.inkMuted)
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.Style, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                            },
+                            modifier = Modifier.testTag("vault_more_flashcards_${lecture.id}"),
+                            onClick = {
+                                moreMenuExpanded = false
+                                onOpenFlashcards()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text("Revision", style = MaterialTheme.typography.labelLarge, color = tokens.inkPrimary)
+                                    Text("Formula & takeaway digest", style = MicroTagMono, color = tokens.inkMuted)
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.AutoStories, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                            },
+                            modifier = Modifier.testTag("vault_more_revision_${lecture.id}"),
+                            onClick = {
+                                moreMenuExpanded = false
+                                onOpenRevision()
+                            },
+                        )
+                    }
+                }
             }
         }
     }

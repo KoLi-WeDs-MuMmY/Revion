@@ -160,6 +160,10 @@ data class PwVaultUiState(
     val previewFlashcardId: String? = null,
     val isPreviewCardFlipped: Boolean = false,
     val selectedRevisionSubjectId: String? = null,
+    // Per-mode Recents tracking (ordered most-recent first)
+    val recentNotesLectureIds: List<String> = emptyList(),
+    val recentFlashcardLectureIds: List<String> = emptyList(),
+    val recentRevisionLectureIds: List<String> = emptyList(),
     // Expandable Command Palette state (Icon-triggered only)
     val isCommandPaletteOpen: Boolean = false,
     val paletteInitialFocus: VaultPaletteFocus = VaultPaletteFocus.SEARCH,
@@ -168,8 +172,7 @@ data class PwVaultUiState(
     val paletteFilterCategory: VaultCategorySubView? = null,
 ) {
     val subjectsForSelectedBatch: List<VaultSubjectNode>
-        get() = subjectsByBatch[selectedBatchId]
-            ?: subjectsByBatch.values.firstOrNull().orEmpty()
+        get() = subjectsByBatch[selectedBatchId].orEmpty()
 
     val selectedSubject: VaultSubjectNode?
         get() = subjectsForSelectedBatch.firstOrNull { it.id == selectedSubjectId }
@@ -187,6 +190,24 @@ data class PwVaultUiState(
 
     val allChaptersInBatch: List<VaultChapterNode>
         get() = subjectsForSelectedBatch.flatMap { it.chapters }
+
+    val recentNotesLectures: List<VaultLectureNode>
+        get() = resolveRecents(recentNotesLectureIds)
+
+    val recentFlashcardLectures: List<VaultLectureNode>
+        get() = resolveRecents(recentFlashcardLectureIds)
+
+    val recentRevisionLectures: List<VaultLectureNode>
+        get() = resolveRecents(recentRevisionLectureIds)
+
+    private fun resolveRecents(ids: List<String>): List<VaultLectureNode> {
+        val all = allLecturesInBatch
+        val byId = all.associateBy { it.id }
+        val explicit = ids.mapNotNull { byId[it] }
+        val fallback = all.filter { lec -> explicit.none { it.id == lec.id } }
+            .sortedByDescending { it.isAutoSavedFromYesterday }
+        return (explicit + fallback).take(4)
+    }
 
     val hasActivePaletteFilter: Boolean
         get() = paletteSearchQuery.isNotBlank() ||
@@ -208,4 +229,80 @@ data class PwVaultUiState(
                 matchSubj && matchQuery
             }
         }
+}
+
+sealed interface BatchCrudDialog {
+    data class EditBatch(
+        val batchId: String,
+        val initialName: String,
+        val initialGoalTag: String,
+        val initialTargetLabel: String,
+        val initialMood: AccentMood,
+    ) : BatchCrudDialog
+
+    data class ConfirmDeleteBatch(
+        val batchId: String,
+        val batchName: String,
+    ) : BatchCrudDialog
+
+    data class AddSubject(
+        val batchId: String,
+    ) : BatchCrudDialog
+
+    data class EditSubject(
+        val batchId: String,
+        val subjectId: String,
+        val initialName: String,
+        val initialMood: AccentMood,
+    ) : BatchCrudDialog
+
+    data class ConfirmDeleteSubject(
+        val batchId: String,
+        val subjectId: String,
+        val subjectName: String,
+    ) : BatchCrudDialog
+
+    data class AddChapter(
+        val batchId: String,
+        val subjectId: String,
+        val subjectName: String,
+    ) : BatchCrudDialog
+
+    data class EditChapter(
+        val batchId: String,
+        val subjectId: String,
+        val chapterId: String,
+        val initialTitle: String,
+    ) : BatchCrudDialog
+
+    data class ConfirmDeleteChapter(
+        val batchId: String,
+        val subjectId: String,
+        val chapterId: String,
+        val chapterTitle: String,
+    ) : BatchCrudDialog
+
+    data class AddLecture(
+        val batchId: String,
+        val subjectId: String,
+        val chapterId: String,
+        val chapterTitle: String,
+    ) : BatchCrudDialog
+
+    data class EditLecture(
+        val batchId: String,
+        val subjectId: String,
+        val chapterId: String,
+        val lectureId: String,
+        val initialTitle: String,
+        val initialDuration: String,
+    ) : BatchCrudDialog
+
+    data class ConfirmDeleteLecture(
+        val batchId: String,
+        val subjectId: String,
+        val chapterId: String,
+        val lectureId: String,
+        val lectureTitle: String,
+    ) : BatchCrudDialog
 }

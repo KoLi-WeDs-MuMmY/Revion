@@ -353,10 +353,10 @@ private fun PaletteFilterChip(
 
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (selected) tokens.slateElevated else tokens.carbonSurface,
+        color = if (selected) tokens.primaryCta else tokens.carbonSurface,
         border = BorderStroke(
             1.dp,
-            if (selected) (dotColor ?: primary).copy(alpha = 0.45f) else tokens.hairlineSubtle,
+            if (selected) tokens.primaryCta else tokens.hairlineSubtle,
         ),
         modifier = Modifier
             .testTag(testTag)
@@ -364,7 +364,7 @@ private fun PaletteFilterChip(
             .clip(RoundedCornerShape(10.dp))
             .clickable(
                 interactionSource = interaction,
-                indication = ripple(color = primary.copy(alpha = 0.14f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
                 role = Role.RadioButton,
                 onClick = onClick,
             ),
@@ -377,7 +377,7 @@ private fun PaletteFilterChip(
             if (dotColor != null) {
                 Box(
                     modifier = Modifier
-                        .size(7.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(dotColor),
                 )
@@ -385,7 +385,7 @@ private fun PaletteFilterChip(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (selected) tokens.inkPrimary else tokens.inkSecondary,
+                color = if (selected) tokens.onPrimaryCta else tokens.inkSecondary,
             )
         }
     }

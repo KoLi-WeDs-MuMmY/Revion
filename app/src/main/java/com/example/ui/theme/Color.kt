@@ -2,31 +2,35 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Pure AMOLED Canvas & Matte Obsidian Surfaces (Architectural Studio — Zero Neon)
+// Pure True-Black OLED Canvas & Grok/Claude Neutral Carbon Surfaces (Zero Neon)
 val AmoledBlack = Color(0xFF000000)
-val ObsidianSurface = Color(0xFF0B0D12)
-val CarbonSurface = Color(0xFF121620)
-val SlateElevated = Color(0xFF181D2A)
-val TrackSubtle = Color(0xFF1C2230)
+val ObsidianSurface = Color(0xFF0A0A0C)
+val CarbonSurface = Color(0xFF121215)
+val SlateElevated = Color(0xFF1A1A1F)
+val TrackSubtle = Color(0xFF24242A)
 
-// Typographic Ink Hierarchy
-val InkPrimary = Color(0xFFF4F6FA)
-val InkSecondary = Color(0xFF98A1B3)
-val InkMuted = Color(0xFF646E82)
-val InkOnAccentDark = Color(0xFF06080C)
+// Grok Monochrome Pure White Primary Action Tokens
+val GrokWhite = Color(0xFFFFFFFF)
+val GrokInkOnWhite = Color(0xFF000000)
 
-// Crisp Hairline Structural Strokes
-val HairlineRest = Color(0x14FFFFFF) // ~8% white anodized edge
-val HairlineSubtle = Color(0x0DFFFFFF) // ~5% divider
-val HairlineSpecularTop = Color(0x22FFFFFF) // subtle top light catch
+// Warm Editorial Chalk Ink Hierarchy (Claude-inspired legibility)
+val InkPrimary = Color(0xFFF5F5F7)
+val InkSecondary = Color(0xFFA1A1AA)
+val InkMuted = Color(0xFF6E6E77)
+val InkOnAccentDark = Color(0xFF050507)
 
-// Semantic Quiz Feedback Tokens (Restrained Editorial Contrast — Zero Neon)
-val FeedbackCorrect = Color(0xFF34D399)
-val FeedbackCorrectContainer = Color(0xFF0B2820)
+// Whisper-Thin Neutral Structural Hairlines
+val HairlineRest = Color(0x18FFFFFF)        // ~9% crisp anodized hairline
+val HairlineSubtle = Color(0x0EFFFFFF)      // ~5.5% quiet inner divider
+val HairlineSpecularTop = Color(0x2AFFFFFF) // subtle edge catch on active cards
+
+// Restrained Semantic Feedback Tokens
+val FeedbackCorrect = Color(0xFF4ADE80)
+val FeedbackCorrectContainer = Color(0xFF0D1F16)
 val FeedbackIncorrect = Color(0xFFF87171)
-val FeedbackIncorrectContainer = Color(0xFF2B1216)
+val FeedbackIncorrectContainer = Color(0xFF241114)
 
-// Refined Curated Multi-Color Dynamic Accents (Mineral / Editorial Tones — Non-Neon)
+// Subtle Muted Mineral Dot Accents (Strictly for 6dp subject dots & quiet progress bars — Zero Neon)
 enum class AccentMood(
     val id: String,
     val label: String,
@@ -39,43 +43,43 @@ enum class AccentMood(
 ) {
     CYAN(
         id = "cyan",
-        label = "Cyan",
-        accent = Color(0xFF38BDF8),
+        label = "Slate",
+        accent = Color(0xFF7DD3FC),
         onAccent = InkOnAccentDark,
-        container = Color(0xFF0D2534),
-        onContainer = Color(0xFFC8ECFD),
-        hairlineTint = Color(0x4738BDF8), // ~28% crisp edge tint
-        surfaceWash = Color(0x1238BDF8),  // ~7% quiet tonal wash
+        container = Color(0xFF14181E),
+        onContainer = Color(0xFFE4E4E7),
+        hairlineTint = Color(0x26FFFFFF),
+        surfaceWash = Color(0x06FFFFFF),
     ),
     VIOLET(
         id = "violet",
-        label = "Violet",
-        accent = Color(0xFFA78BFA),
+        label = "Iris",
+        accent = Color(0xFFC4B5FD),
         onAccent = InkOnAccentDark,
-        container = Color(0xFF1E1733),
-        onContainer = Color(0xFFE4DBFE),
-        hairlineTint = Color(0x47A78BFA),
-        surfaceWash = Color(0x12A78BFA),
+        container = Color(0xFF17151F),
+        onContainer = Color(0xFFE4E4E7),
+        hairlineTint = Color(0x26FFFFFF),
+        surfaceWash = Color(0x06FFFFFF),
     ),
     EMERALD(
         id = "emerald",
-        label = "Emerald",
-        accent = Color(0xFF34D399),
+        label = "Sage",
+        accent = Color(0xFF6EE7B7),
         onAccent = InkOnAccentDark,
-        container = Color(0xFF0B2820),
-        onContainer = Color(0xFFC4F5E1),
-        hairlineTint = Color(0x4734D399),
-        surfaceWash = Color(0x1234D399),
+        container = Color(0xFF121C18),
+        onContainer = Color(0xFFE4E4E7),
+        hairlineTint = Color(0x26FFFFFF),
+        surfaceWash = Color(0x06FFFFFF),
     ),
     AMBER(
         id = "amber",
-        label = "Amber",
-        accent = Color(0xFFFBBF24),
+        label = "Sand",
+        accent = Color(0xFFFCD34D),
         onAccent = InkOnAccentDark,
-        container = Color(0xFF2B200A),
-        onContainer = Color(0xFFFDE9B4),
-        hairlineTint = Color(0x47FBBF24),
-        surfaceWash = Color(0x12FBBF24),
+        container = Color(0xFF1D1A12),
+        onContainer = Color(0xFFE4E4E7),
+        hairlineTint = Color(0x26FFFFFF),
+        surfaceWash = Color(0x06FFFFFF),
     );
 
     fun next(): AccentMood {

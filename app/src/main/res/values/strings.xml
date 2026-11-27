@@ -229,4 +229,34 @@
     <string name="vault_rag_notebooklm_tag">RAG · NotebookLM [Upcoming]</string>
     <string name="vault_flashcards_grouping_hint">Sorted by Chapter → Class</string>
     <string name="vault_revision_grouping_hint">Organized by Subject → Chapter → Lecture</string>
+
+    <!-- Phase 1.6.1.1: Full Batches CRUD, PW Vault Lecture Controls & Recents -->
+    <string name="batches_add_subject_cta">Add Subject</string>
+    <string name="batches_add_chapter_cta">Add Chapter</string>
+    <string name="batches_add_lecture_cta">Add Lecture</string>
+    <string name="batches_action_edit">Edit / Rename</string>
+    <string name="batches_action_delete">Delete</string>
+    <string name="batches_action_more_desc">More options</string>
+    <string name="batches_dialog_save">Save Changes</string>
+    <string name="batches_dialog_add">Add</string>
+    <string name="batches_dialog_cancel">Cancel</string>
+    <string name="batches_dialog_delete_confirm">Delete</string>
+    <string name="batches_edit_batch_title">Edit Batch</string>
+    <string name="batches_delete_batch_title">Delete Batch?</string>
+    <string name="batches_add_subject_title">Add Subject</string>
+    <string name="batches_edit_subject_title">Edit Subject</string>
+    <string name="batches_delete_subject_title">Delete Subject?</string>
+    <string name="batches_add_chapter_title">Add Chapter</string>
+    <string name="batches_edit_chapter_title">Edit Chapter</string>
+    <string name="batches_delete_chapter_title">Delete Chapter?</string>
+    <string name="batches_add_lecture_title">Add Custom Lecture</string>
+    <string name="batches_edit_lecture_title">Edit Lecture</string>
+    <string name="batches_delete_lecture_title">Delete Lecture?</string>
+
+    <string name="vault_play_lecture_cta">Play Lecture</string>
+    <string name="vault_more_options_cta">More</string>
+    <string name="vault_play_lecture_upcoming_notice">Lecture player will be available in the next update.</string>
+    <string name="vault_recents_notes_label">RECENT CLASS NOTES</string>
+    <string name="vault_recents_flashcards_label">RECENT FLASHCARDS</string>
+    <string name="vault_recents_revision_label">RECENT REVISION</string>
 </resources>

@@ -236,7 +236,7 @@ private fun DynamicAccentSwitcher(
     Surface(
         shape = shape,
         color = tokens.obsidianSurface,
-        border = BorderStroke(1.dp, tokens.accentHairline.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, tokens.hairlineRest),
         modifier = Modifier.testTag("dynamic_accent_switcher"),
     ) {
         Row(

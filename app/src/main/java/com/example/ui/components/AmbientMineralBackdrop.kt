@@ -1,12 +1,10 @@
 package com.example.ui.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -24,32 +22,20 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Whisper-soft drifting mineral light washes behind the pure #000000 AMOLED void.
- * Ultra-low opacity (4%–6%) preserves OLED battery efficiency and pitch-black contrast
- * with zero neon glow or cyberpunk visual clutter.
+ * Ultra-minimal studio monochrome sheen over a true #000000 OLED canvas.
+ * Removes neon fog completely while preserving whisper-quiet architectural depth.
  */
 @Composable
 fun AmbientMineralBackdrop(
-    accentMood: AccentMood,
+    @Suppress("UNUSED_PARAMETER") accentMood: AccentMood,
     modifier: Modifier = Modifier,
 ) {
-    val primaryColor by animateColorAsState(
-        targetValue = accentMood.accent,
-        animationSpec = spring(stiffness = 180f),
-        label = "ambientPrimary",
-    )
-    val secondaryColor by animateColorAsState(
-        targetValue = accentMood.next().accent,
-        animationSpec = spring(stiffness = 180f),
-        label = "ambientSecondary",
-    )
-
-    val transition = rememberInfiniteTransition(label = "mineralWashDrift")
+    val transition = rememberInfiniteTransition(label = "monochromeAmbientDrift")
     val driftPhase by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 18000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 22000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "driftPhase",
@@ -65,44 +51,25 @@ fun AmbientMineralBackdrop(
         if (w <= 0f || h <= 0f) return@Canvas
 
         val rad = driftPhase * PI
-        val primaryCenter = Offset(
-            x = w * (0.22f + 0.14f * cos(rad).toFloat()),
-            y = h * (0.18f + 0.10f * sin(rad).toFloat()),
+        val subtleCenter = Offset(
+            x = w * (0.30f + 0.10f * cos(rad).toFloat()),
+            y = h * (0.14f + 0.08f * sin(rad).toFloat()),
         )
-        val secondaryCenter = Offset(
-            x = w * (0.82f - 0.12f * sin(rad).toFloat()),
-            y = h * (0.78f - 0.10f * cos(rad).toFloat()),
-        )
+        val subtleRadius = maxOf(w, h) * 0.52f
 
-        val primaryRadius = maxOf(w, h) * 0.56f
-        val secondaryRadius = maxOf(w, h) * 0.48f
-
+        // Whisper-quiet 2.5% neutral studio light catch on true #000000 black
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    primaryColor.copy(alpha = 0.055f),
-                    primaryColor.copy(alpha = 0.018f),
+                    Color.White.copy(alpha = 0.025f),
+                    Color.White.copy(alpha = 0.008f),
                     Color.Transparent,
                 ),
-                center = primaryCenter,
-                radius = primaryRadius,
+                center = subtleCenter,
+                radius = subtleRadius,
             ),
-            radius = primaryRadius,
-            center = primaryCenter,
-        )
-
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    secondaryColor.copy(alpha = 0.042f),
-                    secondaryColor.copy(alpha = 0.012f),
-                    Color.Transparent,
-                ),
-                center = secondaryCenter,
-                radius = secondaryRadius,
-            ),
-            radius = secondaryRadius,
-            center = secondaryCenter,
+            radius = subtleRadius,
+            center = subtleCenter,
         )
     }
 }

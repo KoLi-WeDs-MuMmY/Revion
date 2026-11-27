@@ -85,6 +85,7 @@ import com.example.ui.theme.KineticDisplayXL
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 import com.example.ui.theme.MonoMetricMedium
+import com.example.ui.theme.rememberScreenLayoutMetrics
 
 @Composable
 fun HomeCommandCenter(
@@ -167,6 +168,7 @@ private fun HomeCommandCanvas(
 ) {
     val primaryBatch = uiState.primaryBatch
     val homeState = uiState.homeCommandState
+    val metrics = rememberScreenLayoutMetrics()
     var showLockedReminder by remember { mutableStateOf(false) }
 
     Box(
@@ -178,12 +180,12 @@ private fun HomeCommandCanvas(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 1320.dp),
+                .widthIn(max = metrics.maxContentWidth),
             contentPadding = PaddingValues(
-                horizontal = if (isWideLayout) 26.dp else 16.dp,
-                vertical = if (isWideLayout) 20.dp else 14.dp,
+                horizontal = metrics.horizontalPadding,
+                vertical = metrics.verticalPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(metrics.sectionSpacing),
         ) {
             item(key = "home_header") {
                 StaggeredEntrance(delayMillis = 0L) {
@@ -380,9 +382,7 @@ private fun PrimaryBatchSyllabusCard(
             .fillMaxWidth()
             .testTag("home_primary_batch_card"),
         containerColor = tokens.obsidianSurface,
-        accentEdgeColor = batchAccent.copy(alpha = 0.34f),
-        surfaceWashColor = batchAccent.copy(alpha = 0.055f),
-        cornerRadius = 22.dp,
+        cornerRadius = 20.dp,
         contentPadding = PaddingValues(20.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -398,14 +398,25 @@ private fun PrimaryBatchSyllabusCard(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = tokens.carbonSurface,
-                        border = BorderStroke(1.dp, batchAccent.copy(alpha = 0.36f)),
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
                     ) {
-                        Text(
-                            text = stringResource(R.string.home_primary_batch_tag),
-                            style = MicroTagMono,
-                            color = batchAccent,
+                        Row(
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        )
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(batchAccent),
+                            )
+                            Text(
+                                text = stringResource(R.string.home_primary_batch_tag),
+                                style = MicroTagMono,
+                                color = tokens.inkPrimary,
+                            )
+                        }
                     }
                     Text(
                         text = batch.goalTag.uppercase(),
@@ -625,12 +636,13 @@ private fun DailyIllustratedGateCard(
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
     val emerald = AccentMood.EMERALD.accent
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(20.dp)
 
     val borderColor by animateColorAsState(
-        targetValue = if (isCompleted) emerald.copy(alpha = 0.44f) else tokens.hairlineRest,
+        targetValue = if (isCompleted) emerald.copy(alpha = 0.36f) else tokens.hairlineRest,
         animationSpec = spring(stiffness = 380f),
         label = "dailyCardBorder_$testTag",
     )
@@ -641,13 +653,13 @@ private fun DailyIllustratedGateCard(
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier
             .fillMaxWidth()
-            .height(176.dp)
+            .height(metrics.dailyCardHeight)
             .testTag(testTag)
             .tactileScale(interactionSource, pressedScale = 0.98f)
             .clip(shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = accentColor.copy(alpha = 0.16f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
                 role = Role.Button,
                 onClick = onClick,
             ),
@@ -692,10 +704,10 @@ private fun DailyIllustratedGateCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isCompleted) emerald.copy(alpha = 0.16f) else tokens.carbonSurface,
+                        color = tokens.carbonSurface,
                         border = BorderStroke(
                             1.dp,
-                            if (isCompleted) emerald.copy(alpha = 0.45f) else accentColor.copy(alpha = 0.34f),
+                            if (isCompleted) emerald.copy(alpha = 0.38f) else tokens.hairlineRest,
                         ),
                     ) {
                         Row(
@@ -721,7 +733,7 @@ private fun DailyIllustratedGateCard(
                             Text(
                                 text = if (isCompleted) "COMPLETED" else "REQUIRED FIRST",
                                 style = MicroTagMono,
-                                color = if (isCompleted) emerald else accentColor,
+                                color = if (isCompleted) emerald else tokens.inkSecondary,
                             )
                         }
                     }
@@ -820,16 +832,16 @@ private fun StudyGateControlBar(
     val unlocked = homeState.isStudyGateUnlocked
 
     val gateBorder by animateColorAsState(
-        targetValue = if (unlocked) emerald.copy(alpha = 0.44f) else tokens.hairlineRest,
+        targetValue = if (unlocked) tokens.inkPrimary.copy(alpha = 0.28f) else tokens.hairlineRest,
         animationSpec = spring(stiffness = 380f),
         label = "studyGateBorder",
     )
     val ctaColor by animateColorAsState(
-        targetValue = if (unlocked) emerald else tokens.slateElevated,
+        targetValue = if (unlocked) tokens.primaryCta else tokens.slateElevated,
         animationSpec = spring(stiffness = 380f),
         label = "studyGateCtaBg",
     )
-    val ctaTextColor = if (unlocked) InkOnAccentDark else tokens.inkSecondary
+    val ctaTextColor = if (unlocked) tokens.onPrimaryCta else tokens.inkSecondary
 
     ObsidianCard(
         modifier = Modifier

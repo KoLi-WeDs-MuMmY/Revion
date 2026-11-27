@@ -82,6 +82,7 @@ import com.example.ui.theme.InkOnAccentDark
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 import com.example.ui.theme.MonoMetricMedium
+import com.example.ui.theme.rememberScreenLayoutMetrics
 
 @Composable
 fun TodayRevisionPage(
@@ -94,7 +95,7 @@ fun TodayRevisionPage(
     BackHandler(onBack = onBackToHome)
 
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
+    val metrics = rememberScreenLayoutMetrics()
     val emerald = AccentMood.EMERALD.accent
 
     Box(
@@ -106,10 +107,10 @@ fun TodayRevisionPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 1220.dp)
+                .widthIn(max = metrics.maxContentWidth)
                 .padding(
-                    horizontal = if (isWideLayout) 28.dp else 16.dp,
-                    vertical = if (isWideLayout) 20.dp else 14.dp,
+                    horizontal = metrics.horizontalPadding,
+                    vertical = metrics.verticalPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -133,7 +134,7 @@ fun TodayRevisionPage(
                             eyebrow = "YESTERDAY'S AI SYNTHESIS · ${state.todayRevisionTakeaways.size} HIGH-YIELD TAKEAWAYS",
                             headline = "Focused Active-Recall Digest",
                             caption = "Distilled strictly from yesterday's logged lectures and automatically archived under Vault → Revision.",
-                            accentColor = primary,
+                            accentColor = tokens.inkSecondary,
                         )
                     }
                 }
@@ -153,13 +154,13 @@ fun TodayRevisionPage(
 
             // Bottom completion CTA
             val completeInteraction = remember { MutableInteractionSource() }
-            val ctaShape = RoundedCornerShape(16.dp)
+            val ctaShape = RoundedCornerShape(14.dp)
             val ctaBg by animateColorAsState(
-                targetValue = if (state.todayRevisionCompleted) emerald.copy(alpha = 0.16f) else emerald,
+                targetValue = if (state.todayRevisionCompleted) tokens.carbonSurface else tokens.primaryCta,
                 animationSpec = spring(stiffness = 380f),
                 label = "revCompleteBg",
             )
-            val ctaInk = if (state.todayRevisionCompleted) emerald else InkOnAccentDark
+            val ctaInk = if (state.todayRevisionCompleted) emerald else tokens.onPrimaryCta
 
             Surface(
                 shape = ctaShape,
@@ -220,6 +221,7 @@ fun TodayFlashcardsPage(
     BackHandler(onBack = onBackToHome)
 
     val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
     val emerald = AccentMood.EMERALD.accent
     val cards = state.todayFlashcards
     val activeCard = state.currentDailyFlashcard
@@ -234,11 +236,11 @@ fun TodayFlashcardsPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 1220.dp)
+                .widthIn(max = metrics.maxContentWidth)
                 .verticalScroll(rememberScrollState())
                 .padding(
-                    horizontal = if (isWideLayout) 28.dp else 16.dp,
-                    vertical = if (isWideLayout) 20.dp else 14.dp,
+                    horizontal = metrics.horizontalPadding,
+                    vertical = metrics.verticalPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -407,8 +409,8 @@ fun TodayFlashcardsPage(
 
                 val doneInteraction = remember { MutableInteractionSource() }
                 val ctaShape = RoundedCornerShape(14.dp)
-                val ctaBg = if (state.todayFlashcardsCompleted) emerald.copy(alpha = 0.16f) else emerald
-                val ctaInk = if (state.todayFlashcardsCompleted) emerald else InkOnAccentDark
+                val ctaBg = if (state.todayFlashcardsCompleted) tokens.carbonSurface else tokens.primaryCta
+                val ctaInk = if (state.todayFlashcardsCompleted) emerald else tokens.onPrimaryCta
                 Surface(
                     shape = ctaShape,
                     color = ctaBg,
@@ -557,7 +559,8 @@ private fun DailyEditorialBanner(
     accentColor: Color,
 ) {
     val tokens = GhickinTokens.colors
-    val shape = RoundedCornerShape(22.dp)
+    val metrics = rememberScreenLayoutMetrics()
+    val shape = RoundedCornerShape(20.dp)
 
     Surface(
         shape = shape,
@@ -565,7 +568,7 @@ private fun DailyEditorialBanner(
         border = BorderStroke(1.dp, tokens.hairlineRest),
         modifier = Modifier
             .fillMaxWidth()
-            .height(148.dp),
+            .height(metrics.heroBannerHeight),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Image(
@@ -575,7 +578,7 @@ private fun DailyEditorialBanner(
                 modifier = Modifier
                     .fillMaxWidth(0.55f)
                     .align(Alignment.CenterEnd)
-                    .height(148.dp),
+                    .height(metrics.heroBannerHeight),
             )
             Box(
                 modifier = Modifier

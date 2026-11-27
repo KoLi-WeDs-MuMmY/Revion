@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.example.model.BatchCrudDialog
 import com.example.model.DailyPageRoute
 import com.example.model.PresetSubjectTemplate
 import com.example.model.VaultCategorySubView
@@ -39,6 +40,7 @@ import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.theme.rememberScreenLayoutMetrics
 import com.example.ui.vault.PwVaultScreen
 
 @Composable
@@ -48,7 +50,7 @@ fun WorkspaceShell(
     onToggleFocusMode: () -> Unit,
     onSelectAccentMood: (AccentMood) -> Unit,
     onCycleAccentMood: () -> Unit,
-    // Phase 1.6.1 Home Command Center & Dedicated Daily Pages callbacks
+    // Home Command Center & Dedicated Daily Pages callbacks
     onSetPrimaryBatch: (String) -> Unit,
     onCyclePrimaryBatch: () -> Unit,
     onOpenDailyPage: (DailyPageRoute) -> Unit,
@@ -61,10 +63,25 @@ fun WorkspaceShell(
     onToggleTodayFlashcardsCompleted: () -> Unit,
     onToggleStudyGateTestOverride: () -> Unit,
     onStartTodaysNewStudy: () -> Unit,
-    // Phase 1.2 + 1.6.1 Batches callbacks
+    // Batches + Full CRUD callbacks
     onSelectBatch: (String) -> Unit,
     onToggleExpandSubject: (String) -> Unit,
+    onToggleExpandChapterInBatches: (String) -> Unit,
     onToggleChapterCompleted: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onToggleLectureCompleted: (batchId: String, subjectId: String, chapterId: String, lectureId: String) -> Unit,
+    onOpenBatchCrudDialog: (BatchCrudDialog) -> Unit,
+    onCloseBatchCrudDialog: () -> Unit,
+    onEditBatch: (batchId: String, name: String, goalTag: String, targetLabel: String, mood: AccentMood) -> Unit,
+    onDeleteBatch: (batchId: String) -> Unit,
+    onAddSubjectToBatch: (batchId: String, name: String, mood: AccentMood) -> Unit,
+    onEditSubject: (batchId: String, subjectId: String, name: String, mood: AccentMood) -> Unit,
+    onDeleteSubject: (batchId: String, subjectId: String) -> Unit,
+    onAddChapterToSubject: (batchId: String, subjectId: String, title: String) -> Unit,
+    onEditChapter: (batchId: String, subjectId: String, chapterId: String, title: String) -> Unit,
+    onDeleteChapter: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onAddLectureToChapter: (batchId: String, subjectId: String, chapterId: String, title: String, duration: String) -> Unit,
+    onEditLecture: (batchId: String, subjectId: String, chapterId: String, lectureId: String, title: String, duration: String) -> Unit,
+    onDeleteLecture: (batchId: String, subjectId: String, chapterId: String, lectureId: String) -> Unit,
     onOpenCreateBatchBuilder: () -> Unit,
     onCloseCreateBatchBuilder: () -> Unit,
     onCreateCustomBatch: (
@@ -74,16 +91,14 @@ fun WorkspaceShell(
         selectedSubjects: List<PresetSubjectTemplate>,
         customSubjectName: String,
     ) -> Unit,
-    // Phase 1.6.1 PW-Style Vault callbacks
+    // PW-Style Vault callbacks
     onSelectPwVaultSubject: (String?) -> Unit,
     onSelectPwVaultChapter: (String?) -> Unit,
     onSelectPwVaultLecture: (String?) -> Unit,
     onSelectPwVaultSubView: (VaultCategorySubView) -> Unit,
     onToggleExpandedClassNote: (String) -> Unit,
-    onToggleExpandedFlashcardChapter: (String) -> Unit,
     onSelectPreviewFlashcard: (String) -> Unit,
     onFlipPreviewFlashcard: () -> Unit,
-    onSelectPwVaultRevisionSubject: (String) -> Unit,
     onOpenVaultCommandPalette: (VaultPaletteFocus) -> Unit,
     onCloseVaultCommandPalette: () -> Unit,
     onUpdateVaultPaletteQuery: (String) -> Unit,
@@ -95,6 +110,7 @@ fun WorkspaceShell(
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
+    val metrics = rememberScreenLayoutMetrics()
 
     val canHandleBack = uiState.activeTab != WorkspaceTab.HOME ||
         uiState.homeCommandState.activeDailyPage != null ||
@@ -109,9 +125,9 @@ fun WorkspaceShell(
             .fillMaxSize()
             .background(tokens.amoledBackground),
     ) {
-        val isWideLayout = maxWidth >= 640.dp || maxWidth > maxHeight
+        val isWideLayout = metrics.isLandscape16By9 || maxWidth >= 640.dp || maxWidth > maxHeight
 
-        // Whisper-soft drifting mineral light wash on pure #000000 AMOLED void (non-neon)
+        // Whisper-quiet neutral studio sheen on pure #000000 true black
         AmbientMineralBackdrop(
             accentMood = uiState.accentMood,
             modifier = Modifier.fillMaxSize(),
@@ -159,7 +175,22 @@ fun WorkspaceShell(
                         onStartTodaysNewStudy = onStartTodaysNewStudy,
                         onSelectBatch = onSelectBatch,
                         onToggleExpandSubject = onToggleExpandSubject,
+                        onToggleExpandChapterInBatches = onToggleExpandChapterInBatches,
                         onToggleChapterCompleted = onToggleChapterCompleted,
+                        onToggleLectureCompleted = onToggleLectureCompleted,
+                        onOpenBatchCrudDialog = onOpenBatchCrudDialog,
+                        onCloseBatchCrudDialog = onCloseBatchCrudDialog,
+                        onEditBatch = onEditBatch,
+                        onDeleteBatch = onDeleteBatch,
+                        onAddSubjectToBatch = onAddSubjectToBatch,
+                        onEditSubject = onEditSubject,
+                        onDeleteSubject = onDeleteSubject,
+                        onAddChapterToSubject = onAddChapterToSubject,
+                        onEditChapter = onEditChapter,
+                        onDeleteChapter = onDeleteChapter,
+                        onAddLectureToChapter = onAddLectureToChapter,
+                        onEditLecture = onEditLecture,
+                        onDeleteLecture = onDeleteLecture,
                         onOpenCreateBatchBuilder = onOpenCreateBatchBuilder,
                         onCloseCreateBatchBuilder = onCloseCreateBatchBuilder,
                         onCreateCustomBatch = onCreateCustomBatch,
@@ -168,10 +199,8 @@ fun WorkspaceShell(
                         onSelectPwVaultLecture = onSelectPwVaultLecture,
                         onSelectPwVaultSubView = onSelectPwVaultSubView,
                         onToggleExpandedClassNote = onToggleExpandedClassNote,
-                        onToggleExpandedFlashcardChapter = onToggleExpandedFlashcardChapter,
                         onSelectPreviewFlashcard = onSelectPreviewFlashcard,
                         onFlipPreviewFlashcard = onFlipPreviewFlashcard,
-                        onSelectPwVaultRevisionSubject = onSelectPwVaultRevisionSubject,
                         onOpenVaultCommandPalette = onOpenVaultCommandPalette,
                         onCloseVaultCommandPalette = onCloseVaultCommandPalette,
                         onUpdateVaultPaletteQuery = onUpdateVaultPaletteQuery,
@@ -217,7 +246,22 @@ fun WorkspaceShell(
                         onStartTodaysNewStudy = onStartTodaysNewStudy,
                         onSelectBatch = onSelectBatch,
                         onToggleExpandSubject = onToggleExpandSubject,
+                        onToggleExpandChapterInBatches = onToggleExpandChapterInBatches,
                         onToggleChapterCompleted = onToggleChapterCompleted,
+                        onToggleLectureCompleted = onToggleLectureCompleted,
+                        onOpenBatchCrudDialog = onOpenBatchCrudDialog,
+                        onCloseBatchCrudDialog = onCloseBatchCrudDialog,
+                        onEditBatch = onEditBatch,
+                        onDeleteBatch = onDeleteBatch,
+                        onAddSubjectToBatch = onAddSubjectToBatch,
+                        onEditSubject = onEditSubject,
+                        onDeleteSubject = onDeleteSubject,
+                        onAddChapterToSubject = onAddChapterToSubject,
+                        onEditChapter = onEditChapter,
+                        onDeleteChapter = onDeleteChapter,
+                        onAddLectureToChapter = onAddLectureToChapter,
+                        onEditLecture = onEditLecture,
+                        onDeleteLecture = onDeleteLecture,
                         onOpenCreateBatchBuilder = onOpenCreateBatchBuilder,
                         onCloseCreateBatchBuilder = onCloseCreateBatchBuilder,
                         onCreateCustomBatch = onCreateCustomBatch,
@@ -226,10 +270,8 @@ fun WorkspaceShell(
                         onSelectPwVaultLecture = onSelectPwVaultLecture,
                         onSelectPwVaultSubView = onSelectPwVaultSubView,
                         onToggleExpandedClassNote = onToggleExpandedClassNote,
-                        onToggleExpandedFlashcardChapter = onToggleExpandedFlashcardChapter,
                         onSelectPreviewFlashcard = onSelectPreviewFlashcard,
                         onFlipPreviewFlashcard = onFlipPreviewFlashcard,
-                        onSelectPwVaultRevisionSubject = onSelectPwVaultRevisionSubject,
                         onOpenVaultCommandPalette = onOpenVaultCommandPalette,
                         onCloseVaultCommandPalette = onCloseVaultCommandPalette,
                         onUpdateVaultPaletteQuery = onUpdateVaultPaletteQuery,
@@ -271,7 +313,22 @@ private fun WorkspaceStage(
     onStartTodaysNewStudy: () -> Unit,
     onSelectBatch: (String) -> Unit,
     onToggleExpandSubject: (String) -> Unit,
+    onToggleExpandChapterInBatches: (String) -> Unit,
     onToggleChapterCompleted: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onToggleLectureCompleted: (batchId: String, subjectId: String, chapterId: String, lectureId: String) -> Unit,
+    onOpenBatchCrudDialog: (BatchCrudDialog) -> Unit,
+    onCloseBatchCrudDialog: () -> Unit,
+    onEditBatch: (batchId: String, name: String, goalTag: String, targetLabel: String, mood: AccentMood) -> Unit,
+    onDeleteBatch: (batchId: String) -> Unit,
+    onAddSubjectToBatch: (batchId: String, name: String, mood: AccentMood) -> Unit,
+    onEditSubject: (batchId: String, subjectId: String, name: String, mood: AccentMood) -> Unit,
+    onDeleteSubject: (batchId: String, subjectId: String) -> Unit,
+    onAddChapterToSubject: (batchId: String, subjectId: String, title: String) -> Unit,
+    onEditChapter: (batchId: String, subjectId: String, chapterId: String, title: String) -> Unit,
+    onDeleteChapter: (batchId: String, subjectId: String, chapterId: String) -> Unit,
+    onAddLectureToChapter: (batchId: String, subjectId: String, chapterId: String, title: String, duration: String) -> Unit,
+    onEditLecture: (batchId: String, subjectId: String, chapterId: String, lectureId: String, title: String, duration: String) -> Unit,
+    onDeleteLecture: (batchId: String, subjectId: String, chapterId: String, lectureId: String) -> Unit,
     onOpenCreateBatchBuilder: () -> Unit,
     onCloseCreateBatchBuilder: () -> Unit,
     onCreateCustomBatch: (
@@ -286,10 +343,8 @@ private fun WorkspaceStage(
     onSelectPwVaultLecture: (String?) -> Unit,
     onSelectPwVaultSubView: (VaultCategorySubView) -> Unit,
     onToggleExpandedClassNote: (String) -> Unit,
-    onToggleExpandedFlashcardChapter: (String) -> Unit,
     onSelectPreviewFlashcard: (String) -> Unit,
     onFlipPreviewFlashcard: () -> Unit,
-    onSelectPwVaultRevisionSubject: (String) -> Unit,
     onOpenVaultCommandPalette: (VaultPaletteFocus) -> Unit,
     onCloseVaultCommandPalette: () -> Unit,
     onUpdateVaultPaletteQuery: (String) -> Unit,
@@ -347,7 +402,22 @@ private fun WorkspaceStage(
                 onSelectBatch = onSelectBatch,
                 onSetPrimaryBatch = onSetPrimaryBatch,
                 onToggleExpandSubject = onToggleExpandSubject,
+                onToggleExpandChapter = onToggleExpandChapterInBatches,
                 onToggleChapterCompleted = onToggleChapterCompleted,
+                onToggleLectureCompleted = onToggleLectureCompleted,
+                onOpenCrudDialog = onOpenBatchCrudDialog,
+                onCloseCrudDialog = onCloseBatchCrudDialog,
+                onEditBatch = onEditBatch,
+                onDeleteBatch = onDeleteBatch,
+                onAddSubject = onAddSubjectToBatch,
+                onEditSubject = onEditSubject,
+                onDeleteSubject = onDeleteSubject,
+                onAddChapter = onAddChapterToSubject,
+                onEditChapter = onEditChapter,
+                onDeleteChapter = onDeleteChapter,
+                onAddLecture = onAddLectureToChapter,
+                onEditLecture = onEditLecture,
+                onDeleteLecture = onDeleteLecture,
                 onOpenBuilder = onOpenCreateBatchBuilder,
                 onCloseBuilder = onCloseCreateBatchBuilder,
                 onCreateBatch = onCreateCustomBatch,
@@ -363,10 +433,8 @@ private fun WorkspaceStage(
                 onSelectLecture = onSelectPwVaultLecture,
                 onSelectSubView = onSelectPwVaultSubView,
                 onToggleExpandClassNote = onToggleExpandedClassNote,
-                onToggleExpandFlashcardChapter = onToggleExpandedFlashcardChapter,
                 onSelectPreviewFlashcard = onSelectPreviewFlashcard,
                 onFlipPreviewFlashcard = onFlipPreviewFlashcard,
-                onSelectRevisionSubject = onSelectPwVaultRevisionSubject,
                 onOpenCommandPalette = onOpenVaultCommandPalette,
                 onCloseCommandPalette = onCloseVaultCommandPalette,
                 onUpdatePaletteQuery = onUpdateVaultPaletteQuery,

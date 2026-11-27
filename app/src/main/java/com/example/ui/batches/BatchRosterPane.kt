@@ -1,7 +1,6 @@
 package com.example.ui.batches
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,8 +20,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +36,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +52,9 @@ import com.example.model.StudyBatch
 import com.example.ui.components.AnimatedLinearProgressBar
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.tactileScale
+import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 
 @Composable
@@ -55,16 +64,18 @@ fun BatchRosterPane(
     primaryBatchId: String,
     onSelectBatch: (String) -> Unit,
     onCreateBatchClick: () -> Unit,
+    onSetPrimaryBatch: (String) -> Unit,
+    onEditBatchClick: (StudyBatch) -> Unit,
+    onAddSubjectToBatchClick: (StudyBatch) -> Unit,
+    onDeleteBatchClick: (StudyBatch) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
-    val onPrimary = MaterialTheme.colorScheme.onPrimary
 
     ObsidianCard(
         modifier = modifier.testTag("batch_roster_pane"),
         containerColor = tokens.obsidianSurface,
-        cornerRadius = 22.dp,
+        cornerRadius = 20.dp,
         contentPadding = PaddingValues(16.dp),
     ) {
         Column(
@@ -83,7 +94,7 @@ fun BatchRosterPane(
                     Icon(
                         imageVector = Icons.Rounded.Layers,
                         contentDescription = null,
-                        tint = primary,
+                        tint = tokens.inkSecondary,
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
@@ -94,17 +105,17 @@ fun BatchRosterPane(
                 }
                 Text(
                     text = "${batches.size} ACTIVE",
-                    style = MonoBadgeStyle,
+                    style = MicroTagMono,
                     color = tokens.inkMuted,
                 )
             }
 
-            // "+ Create Custom Batch" primary CTA
+            // Grok pure monochrome white primary CTA
             val createInteraction = remember { MutableInteractionSource() }
             val ctaShape = RoundedCornerShape(14.dp)
             Surface(
                 shape = ctaShape,
-                color = primary,
+                color = tokens.primaryCta,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("create_custom_batch_button")
@@ -113,7 +124,7 @@ fun BatchRosterPane(
                     .clip(ctaShape)
                     .clickable(
                         interactionSource = createInteraction,
-                        indication = ripple(color = onPrimary.copy(alpha = 0.2f)),
+                        indication = ripple(color = tokens.onPrimaryCta.copy(alpha = 0.2f)),
                         role = Role.Button,
                         onClick = onCreateBatchClick,
                     ),
@@ -128,26 +139,31 @@ fun BatchRosterPane(
                     Icon(
                         imageVector = Icons.Rounded.Add,
                         contentDescription = null,
-                        tint = onPrimary,
+                        tint = tokens.onPrimaryCta,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.batches_create_cta),
                         style = MaterialTheme.typography.labelLarge,
-                        color = onPrimary,
+                        color = tokens.onPrimaryCta,
                     )
                 }
             }
 
-            // Batch list items
+            // Batch list items with inline 3-dot CRUD menus
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 batches.forEach { batch ->
                     BatchRosterTile(
                         batch = batch,
                         selected = batch.id == selectedBatchId,
                         isPrimary = batch.id == primaryBatchId,
+                        canDelete = batches.size > 1,
                         onClick = { onSelectBatch(batch.id) },
+                        onSetPrimary = { onSetPrimaryBatch(batch.id) },
+                        onEdit = { onEditBatchClick(batch) },
+                        onAddSubject = { onAddSubjectToBatchClick(batch) },
+                        onDelete = { onDeleteBatchClick(batch) },
                     )
                 }
             }
@@ -160,12 +176,18 @@ private fun BatchRosterTile(
     batch: StudyBatch,
     selected: Boolean,
     isPrimary: Boolean,
+    canDelete: Boolean,
     onClick: () -> Unit,
+    onSetPrimary: () -> Unit,
+    onEdit: () -> Unit,
+    onAddSubject: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val accent = batch.accentMood.accent
+    val dotAccent = batch.accentMood.accent
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(15.dp)
+    var menuExpanded by remember { mutableStateOf(false) }
 
     val containerColor by animateColorAsState(
         targetValue = if (selected) tokens.slateElevated else tokens.carbonSurface,
@@ -173,14 +195,9 @@ private fun BatchRosterTile(
         label = "batchTileBg_${batch.id}",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (selected) accent.copy(alpha = 0.52f) else tokens.hairlineSubtle,
+        targetValue = if (selected) tokens.inkPrimary.copy(alpha = 0.24f) else tokens.hairlineSubtle,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 400f),
         label = "batchTileBorder_${batch.id}",
-    )
-    val barHeight by animateDpAsState(
-        targetValue = if (selected) 36.dp else 14.dp,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = 420f),
-        label = "batchTileBar_${batch.id}",
     )
 
     Surface(
@@ -191,11 +208,11 @@ private fun BatchRosterTile(
             .fillMaxWidth()
             .testTag("batch_tile_${batch.id}")
             .minimumInteractiveComponentSize()
-            .tactileScale(interactionSource, pressedScale = 0.98f)
+            .tactileScale(interactionSource, pressedScale = 0.985f)
             .clip(shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = accent.copy(alpha = 0.16f)),
+                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.12f)),
                 role = Role.Tab,
                 onClick = onClick,
             ),
@@ -203,18 +220,9 @@ private fun BatchRosterTile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .width(3.5.dp)
-                    .height(barHeight)
-                    .clip(RoundedCornerShape(100.dp))
-                    .background(if (selected) accent else accent.copy(alpha = 0.45f)),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -226,24 +234,30 @@ private fun BatchRosterTile(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(dotAccent),
+                        )
                         Text(
                             text = batch.goalTag.uppercase(),
-                            style = MonoBadgeStyle,
-                            color = accent,
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
                             maxLines = 1,
                         )
                         if (isPrimary) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = tokens.obsidianSurface,
-                                border = BorderStroke(1.dp, accent.copy(alpha = 0.36f)),
+                                border = BorderStroke(1.dp, tokens.hairlineRest),
                             ) {
                                 Text(
                                     text = stringResource(R.string.batches_primary_badge),
-                                    style = MonoBadgeStyle,
-                                    color = accent,
+                                    style = MicroTagMono,
+                                    color = tokens.inkPrimary,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 )
                             }
@@ -252,7 +266,7 @@ private fun BatchRosterTile(
                     Text(
                         text = "${batch.overallProgressPercent}%",
                         style = MonoBadgeStyle,
-                        color = if (selected) tokens.inkPrimary else tokens.inkMuted,
+                        color = if (selected) tokens.inkPrimary else tokens.inkSecondary,
                     )
                 }
 
@@ -271,13 +285,13 @@ private fun BatchRosterTile(
                     batch.subjects.take(4).forEach { subject ->
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(5.dp)
                                 .clip(CircleShape)
                                 .background(subject.accentMood.accent),
                         )
                     }
                     Text(
-                        text = "${batch.subjects.size} subjects · ${batch.completedChapters}/${batch.totalChapters} ch",
+                        text = "${batch.subjects.size} subjects · ${batch.totalChapters} ch",
                         style = MaterialTheme.typography.labelSmall,
                         color = tokens.inkSecondary,
                         maxLines = 1,
@@ -287,9 +301,76 @@ private fun BatchRosterTile(
 
                 AnimatedLinearProgressBar(
                     progressPercent = batch.overallProgressPercent,
-                    accentColor = accent,
-                    height = 4.dp,
+                    accentColor = tokens.inkPrimary.copy(alpha = 0.85f),
+                    height = 3.dp,
                 )
+            }
+
+            // Inline 3-dot menu for full batch CRUD
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.testTag("batch_menu_${batch.id}"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "Batch options for ${batch.name}",
+                        tint = tokens.inkMuted,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    containerColor = tokens.carbonSurface,
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
+                ) {
+                    if (!isPrimary) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_set_primary_cta), color = tokens.inkPrimary) },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.StarOutline, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onSetPrimary()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.batches_add_subject_cta), color = tokens.inkPrimary) },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onAddSubject()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.batches_action_edit), color = tokens.inkPrimary) },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Edit, contentDescription = null, tint = tokens.inkSecondary, modifier = Modifier.size(18.dp))
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onEdit()
+                        },
+                    )
+                    if (canDelete) {
+                        val errorColor = MaterialTheme.colorScheme.error
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.batches_action_delete), color = errorColor) },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = errorColor, modifier = Modifier.size(18.dp))
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                        )
+                    }
+                }
             }
         }
     }

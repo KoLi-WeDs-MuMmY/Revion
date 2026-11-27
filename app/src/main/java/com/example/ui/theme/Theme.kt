@@ -27,6 +27,8 @@ data class GhickinExtendedColors(
     val hairlineSpecularTop: Color,
     val accentHairline: Color,
     val accentSurfaceWash: Color,
+    val primaryCta: Color,
+    val onPrimaryCta: Color,
     val inkPrimary: Color,
     val inkSecondary: Color,
     val inkMuted: Color,
@@ -43,8 +45,10 @@ val LocalGhickinColors = staticCompositionLocalOf {
         hairlineRest = HairlineRest,
         hairlineSubtle = HairlineSubtle,
         hairlineSpecularTop = HairlineSpecularTop,
-        accentHairline = AccentMood.CYAN.hairlineTint,
-        accentSurfaceWash = AccentMood.CYAN.surfaceWash,
+        accentHairline = HairlineSpecularTop,
+        accentSurfaceWash = Color(0x06FFFFFF),
+        primaryCta = GrokWhite,
+        onPrimaryCta = GrokInkOnWhite,
         inkPrimary = InkPrimary,
         inkSecondary = InkSecondary,
         inkMuted = InkMuted,
@@ -56,8 +60,8 @@ val GhickinShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(26.dp),
 )
 
 @Composable
@@ -70,30 +74,23 @@ fun GhickinTheme(
         stiffness = Spring.StiffnessMediumLow,
     )
 
-    val primary by animateColorAsState(accentMood.accent, colorSpring, label = "primary")
-    val onPrimary by animateColorAsState(accentMood.onAccent, colorSpring, label = "onPrimary")
-    val primaryContainer by animateColorAsState(accentMood.container, colorSpring, label = "primaryContainer")
-    val onPrimaryContainer by animateColorAsState(accentMood.onContainer, colorSpring, label = "onPrimaryContainer")
-    val accentHairline by animateColorAsState(accentMood.hairlineTint, colorSpring, label = "accentHairline")
-    val accentSurfaceWash by animateColorAsState(accentMood.surfaceWash, colorSpring, label = "accentSurfaceWash")
-
-    val secondaryMood = accentMood.next()
-    val secondary by animateColorAsState(secondaryMood.accent, colorSpring, label = "secondary")
-    val secondaryContainer by animateColorAsState(secondaryMood.container, colorSpring, label = "secondaryContainer")
+    // Grok Minimal: pure monochrome white primary CTAs on true #000000 black,
+    // keeping color strictly restrained to subtle mineral dots & semantic cues.
+    val subtleAccent by animateColorAsState(accentMood.accent, colorSpring, label = "subtleAccent")
 
     val colorScheme = darkColorScheme(
-        primary = primary,
-        onPrimary = onPrimary,
-        primaryContainer = primaryContainer,
-        onPrimaryContainer = onPrimaryContainer,
-        secondary = secondary,
+        primary = GrokWhite,
+        onPrimary = GrokInkOnWhite,
+        primaryContainer = SlateElevated,
+        onPrimaryContainer = InkPrimary,
+        secondary = subtleAccent,
         onSecondary = InkOnAccentDark,
-        secondaryContainer = secondaryContainer,
-        onSecondaryContainer = secondaryMood.onContainer,
+        secondaryContainer = CarbonSurface,
+        onSecondaryContainer = InkPrimary,
         tertiary = AccentMood.EMERALD.accent,
         onTertiary = InkOnAccentDark,
         tertiaryContainer = AccentMood.EMERALD.container,
-        onTertiaryContainer = AccentMood.EMERALD.onContainer,
+        onTertiaryContainer = InkPrimary,
         background = AmoledBlack,
         onBackground = InkPrimary,
         surface = ObsidianSurface,
@@ -118,8 +115,10 @@ fun GhickinTheme(
         hairlineRest = HairlineRest,
         hairlineSubtle = HairlineSubtle,
         hairlineSpecularTop = HairlineSpecularTop,
-        accentHairline = accentHairline,
-        accentSurfaceWash = accentSurfaceWash,
+        accentHairline = HairlineSpecularTop,
+        accentSurfaceWash = Color(0x05FFFFFF),
+        primaryCta = GrokWhite,
+        onPrimaryCta = GrokInkOnWhite,
         inkPrimary = InkPrimary,
         inkSecondary = InkSecondary,
         inkMuted = InkMuted,
