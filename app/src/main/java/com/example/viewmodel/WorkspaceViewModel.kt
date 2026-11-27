@@ -1,9 +1,12 @@
 package com.example.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.model.AiPermissionRequest
 import com.example.model.BatchChapter
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
+import com.example.model.CounterProposal
 import com.example.model.DailyRevisionBrief
 import com.example.model.FlashcardHubMode
 import com.example.model.FlashcardRating
@@ -13,9 +16,15 @@ import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
 import com.example.model.MaterialType
 import com.example.model.MistakeCategory
+import com.example.model.PermissionRequestAction
+import com.example.model.PermissionVerdictPhase
 import com.example.model.Phase12MockData
 import com.example.model.Phase13MockData
 import com.example.model.Phase14MockData
+import com.example.model.Phase15MockData
+import com.example.model.PlannerApprovalStatus
+import com.example.model.PlannerBlock
+import com.example.model.PlannerBlockCategory
 import com.example.model.PresetSubjectTemplate
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
@@ -25,20 +34,30 @@ import com.example.model.SpacedIntervalBucket
 import com.example.model.SpacedReviewItem
 import com.example.model.StudyBatch
 import com.example.model.SubjectMastery
+import com.example.model.TutorMessage
+import com.example.model.TutorPlannerMode
+import com.example.model.TutorPlannerUiState
 import com.example.model.VaultMaterial
 import com.example.model.VaultUiState
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
+import com.example.model.formatClockMinutes
 import com.example.ui.theme.AccentMood
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class WorkspaceViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(createInitialMockState())
     val uiState: StateFlow<WorkspaceUiState> = _uiState.asStateFlow()
+
+    private var tutorReplyJob: Job? = null
+    private var permissionEvalJob: Job? = null
 
     // --- Phase 1.1 Workspace & Home Actions ---
 
@@ -760,6 +779,473 @@ class WorkspaceViewModel : ViewModel() {
         }
     }
 
+    // --- Phase 1.5 Chapter RAG AI Tutor & Adaptive Wake-to-Sleep Planner Actions ---
+
+    fun selectTutorPlannerMode(mode: TutorPlannerMode) {
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    activeMode = mode,
+                    isCoPlanSplitEnabled = false,
+                ),
+            )
+        }
+    }
+
+    fun toggleCoPlanSplit() {
+        _uiState.update { state ->
+            val current = state.tutorPlannerState
+            state.copy(
+                tutorPlannerState = current.copy(
+                    isCoPlanSplitEnabled = !current.isCoPlanSplitEnabled,
+                ),
+            )
+        }
+    }
+
+    fun selectRagChapter(chapterId: String) {
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    selectedChapterId = chapterId,
+                ),
+            )
+        }
+    }
+
+    fun sendTutorDoubt(rawPrompt: String) {
+        val trimmed = rawPrompt.trim()
+        if (trimmed.isEmpty()) return
+
+        val chapter = _uiState.value.tutorPlannerState.selectedChapter
+        val userMsg = TutorMessage(
+            id = "usr_${System.nanoTime()}",
+            isUser = true,
+            text = trimmed,
+            timestampLabel = "Just now",
+        )
+
+        _uiState.update { state ->
+            val current = state.tutorPlannerState
+            val existing = current.messagesByChapter[chapter.id].orEmpty()
+            state.copy(
+                tutorPlannerState = current.copy(
+                    messagesByChapter = current.messagesByChapter + (chapter.id to (existing + userMsg)),
+                    isTutorTyping = true,
+                ),
+            )
+        }
+
+        tutorReplyJob?.cancel()
+        tutorReplyJob = viewModelScope.launch {
+            delay(850L)
+            val reply = Phase15MockData.generateMockCitedReply(
+                chapter = chapter,
+                userQuestion = trimmed,
+                timestampLabel = "Just now",
+            )
+            _uiState.update { state ->
+                val current = state.tutorPlannerState
+                val existing = current.messagesByChapter[chapter.id].orEmpty()
+                val updatedChapters = current.chapters.map { ctx ->
+                    if (ctx.id == chapter.id) {
+                        ctx.copy(memoryTurnsCount = ctx.memoryTurnsCount + 1)
+                    } else {
+                        ctx
+                    }
+                }
+                state.copy(
+                    tutorPlannerState = current.copy(
+                        chapters = updatedChapters,
+                        messagesByChapter = current.messagesByChapter + (chapter.id to (existing + reply)),
+                        isTutorTyping = false,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun openPlannerScheduleSettings() {
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(isScheduleSettingsOpen = true),
+            )
+        }
+    }
+
+    fun closePlannerScheduleSettings() {
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(isScheduleSettingsOpen = false),
+            )
+        }
+    }
+
+    fun toggleAdaptiveSync(enabled: Boolean) {
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(isAdaptiveSyncEnabled = enabled),
+            )
+        }
+    }
+
+    fun stepManualWakeMinutes(deltaMinutes: Int) {
+        _uiState.update { state ->
+            val current = state.tutorPlannerState
+            val nextWake = (current.manualWakeMinutes + deltaMinutes).coerceIn(240, 600) // 04:00..10:00
+            state.copy(
+                tutorPlannerState = current.copy(
+                    manualWakeMinutes = nextWake,
+                    isAdaptiveSyncEnabled = false,
+                ),
+            )
+        }
+    }
+
+    fun stepManualSleepMinutes(deltaMinutes: Int) {
+        _uiState.update { state ->
+            val current = state.tutorPlannerState
+            val nextSleep = (current.manualSleepMinutes + deltaMinutes).coerceIn(1200, 1425) // 20:00..23:45
+            state.copy(
+                tutorPlannerState = current.copy(
+                    manualSleepMinutes = nextSleep,
+                    isAdaptiveSyncEnabled = false,
+                ),
+            )
+        }
+    }
+
+    fun togglePlannerBlockCompleted(blockId: String) {
+        _uiState.update { state ->
+            val updatedBlocks = state.tutorPlannerState.blocks.map { block ->
+                if (block.id == blockId) block.copy(isCompleted = !block.isCompleted) else block
+            }
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(blocks = updatedBlocks),
+            )
+        }
+    }
+
+    fun openPermissionRequestForAdd() {
+        val current = _uiState.value.tutorPlannerState
+        val defaultStart = (current.effectiveWakeMinutes + 600).coerceAtMost(current.effectiveSleepMinutes - 60)
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    activePermissionRequest = AiPermissionRequest(
+                        targetBlockId = null,
+                        targetBlockTitle = null,
+                        targetIsCritical = false,
+                        action = PermissionRequestAction.ADD_BLOCK,
+                        proposedTitle = "Targeted Weak-Topic Drill",
+                        proposedCategory = PlannerBlockCategory.REVISION,
+                        proposedStartMinutes = defaultStart,
+                        proposedDurationMinutes = 45,
+                        reasonText = "Need extra focused slot for Gauss's Law cavity problems.",
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun openPermissionRequestForEdit(blockId: String) {
+        val block = _uiState.value.tutorPlannerState.blocks.firstOrNull { it.id == blockId } ?: return
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    activePermissionRequest = AiPermissionRequest(
+                        targetBlockId = block.id,
+                        targetBlockTitle = block.title,
+                        targetIsCritical = block.isCriticalPriority,
+                        action = PermissionRequestAction.EDIT_BLOCK,
+                        proposedTitle = block.title,
+                        proposedCategory = block.category,
+                        proposedStartMinutes = block.startMinutes,
+                        proposedDurationMinutes = block.durationMinutes,
+                        reasonText = "",
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun closePermissionRequest() {
+        permissionEvalJob?.cancel()
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(activePermissionRequest = null),
+            )
+        }
+    }
+
+    fun updatePermissionRequestDraft(
+        action: PermissionRequestAction? = null,
+        proposedTitle: String? = null,
+        proposedCategory: PlannerBlockCategory? = null,
+        proposedStartMinutes: Int? = null,
+        proposedDurationMinutes: Int? = null,
+        reasonText: String? = null,
+    ) {
+        _uiState.update { state ->
+            val req = state.tutorPlannerState.activePermissionRequest ?: return@update state
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    activePermissionRequest = req.copy(
+                        action = action ?: req.action,
+                        proposedTitle = proposedTitle ?: req.proposedTitle,
+                        proposedCategory = proposedCategory ?: req.proposedCategory,
+                        proposedStartMinutes = (proposedStartMinutes ?: req.proposedStartMinutes).coerceIn(300, 1410),
+                        proposedDurationMinutes = (proposedDurationMinutes ?: req.proposedDurationMinutes).coerceIn(15, 150),
+                        reasonText = reasonText ?: req.reasonText,
+                        phase = PermissionVerdictPhase.DRAFTING,
+                        verdictHeadline = "",
+                        verdictExplanation = "",
+                        counterProposal = null,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun submitPermissionRequestToAi() {
+        val currentState = _uiState.value.tutorPlannerState
+        val req = currentState.activePermissionRequest ?: return
+
+        _uiState.update { state ->
+            state.copy(
+                tutorPlannerState = state.tutorPlannerState.copy(
+                    isCoPlanSplitEnabled = true,
+                    activePermissionRequest = req.copy(phase = PermissionVerdictPhase.EVALUATING),
+                ),
+            )
+        }
+
+        permissionEvalJob?.cancel()
+        permissionEvalJob = viewModelScope.launch {
+            delay(720L)
+            _uiState.update { state ->
+                val planner = state.tutorPlannerState
+                val latestReq = planner.activePermissionRequest ?: return@update state
+                val wake = planner.effectiveWakeMinutes
+                val sleep = planner.effectiveSleepMinutes
+                val endMins = latestReq.proposedStartMinutes + latestReq.proposedDurationMinutes
+
+                val evaluatedReq = when {
+                    latestReq.action == PermissionRequestAction.DELETE_BLOCK && latestReq.targetIsCritical -> {
+                        val safeStart = latestReq.proposedStartMinutes
+                        latestReq.copy(
+                            phase = PermissionVerdictPhase.BLOCKED,
+                            verdictHeadline = "Protected Spaced-Recall Block",
+                            verdictExplanation = "Skipping '${latestReq.targetBlockTitle ?: latestReq.proposedTitle}' breaks your x-1 / Quiz retention curve. Direct removal stays locked.",
+                            counterProposal = CounterProposal(
+                                title = "${latestReq.targetBlockTitle ?: latestReq.proposedTitle} (Micro-Sprint)",
+                                category = latestReq.proposedCategory,
+                                startMinutes = safeStart,
+                                durationMinutes = 30,
+                                summary = "Keep the slot intact as a focused 30 min sprint instead of skipping.",
+                            ),
+                        )
+                    }
+
+                    latestReq.action != PermissionRequestAction.DELETE_BLOCK && endMins > sleep -> {
+                        val safeDuration = latestReq.proposedDurationMinutes.coerceAtMost(60)
+                        val safeStart = (sleep - safeDuration - 15).coerceAtLeast(wake + 30)
+                        latestReq.copy(
+                            phase = PermissionVerdictPhase.BLOCKED,
+                            verdictHeadline = "Sleep Boundary Violation",
+                            verdictExplanation = "Proposed end time (${formatClockMinutes(endMins)}) crosses your ${formatClockMinutes(sleep)} Sleep Boundary. Direct apply stays locked to protect recovery.",
+                            counterProposal = CounterProposal(
+                                title = latestReq.proposedTitle.ifBlank { "Focused Study Block" },
+                                category = latestReq.proposedCategory,
+                                startMinutes = safeStart,
+                                durationMinutes = safeDuration,
+                                summary = "Shift to ${formatClockMinutes(safeStart)}–${formatClockMinutes(safeStart + safeDuration)} so you wind down 15 min before Sleep Anchor.",
+                            ),
+                        )
+                    }
+
+                    latestReq.action != PermissionRequestAction.DELETE_BLOCK && latestReq.proposedStartMinutes < wake -> {
+                        val safeStart = wake + 15
+                        latestReq.copy(
+                            phase = PermissionVerdictPhase.BLOCKED,
+                            verdictHeadline = "Precedes Wake Anchor",
+                            verdictExplanation = "Start time (${formatClockMinutes(latestReq.proposedStartMinutes)}) is earlier than your ${formatClockMinutes(wake)} Wake Anchor.",
+                            counterProposal = CounterProposal(
+                                title = latestReq.proposedTitle.ifBlank { "Morning Study Block" },
+                                category = latestReq.proposedCategory,
+                                startMinutes = safeStart,
+                                durationMinutes = latestReq.proposedDurationMinutes,
+                                summary = "Start at ${formatClockMinutes(safeStart)} right after your observed wake-up buffer.",
+                            ),
+                        )
+                    }
+
+                    latestReq.action != PermissionRequestAction.DELETE_BLOCK &&
+                        latestReq.proposedCategory == PlannerBlockCategory.BREAK_MEAL &&
+                        latestReq.proposedDurationMinutes > 60 -> {
+                        latestReq.copy(
+                            phase = PermissionVerdictPhase.BLOCKED,
+                            verdictHeadline = "Break Exceeds Focus Budget",
+                            verdictExplanation = "A ${latestReq.proposedDurationMinutes} min break cuts into your ${planner.remainingSyllabusChapters}-chapter remaining syllabus pace. Direct edit remains locked.",
+                            counterProposal = CounterProposal(
+                                title = latestReq.proposedTitle.ifBlank { "Structured Recovery Break" },
+                                category = PlannerBlockCategory.BREAK_MEAL,
+                                startMinutes = latestReq.proposedStartMinutes,
+                                durationMinutes = 30,
+                                summary = "Approve a clean 30 min recovery break without slipping tonight's Maths sprint.",
+                            ),
+                        )
+                    }
+
+                    else -> {
+                        latestReq.copy(
+                            phase = PermissionVerdictPhase.APPROVED,
+                            verdictHeadline = "Schedule Rule Check Passed",
+                            verdictExplanation = "Fits cleanly inside your ${formatClockMinutes(wake)}–${formatClockMinutes(sleep)} awake window and preserves all protected x-1 & Quiz blocks. Edit controls are now unlocked.",
+                            counterProposal = null,
+                        )
+                    }
+                }
+
+                // Append a synchronized AI Planner Guardrail audit note into the active Tutor stream
+                val activeChapterId = planner.selectedChapter.id
+                val auditNote = TutorMessage(
+                    id = "audit_${System.nanoTime()}",
+                    isUser = false,
+                    text = if (evaluatedReq.phase == PermissionVerdictPhase.APPROVED) {
+                        "Planner Permission Approved: '${evaluatedReq.proposedTitle}' (${formatClockMinutes(evaluatedReq.proposedStartMinutes)}, ${evaluatedReq.proposedDurationMinutes}m) satisfies your Wake-to-Sleep and x-1 rules. Confirm in the Planner pane to apply."
+                    } else {
+                        "Planner Permission Blocked (${evaluatedReq.verdictHeadline}): ${evaluatedReq.verdictExplanation}"
+                    },
+                    timestampLabel = "Co-Plan",
+                    isPlannerAuditNote = true,
+                )
+                val existingMsgs = planner.messagesByChapter[activeChapterId].orEmpty()
+
+                state.copy(
+                    tutorPlannerState = planner.copy(
+                        activePermissionRequest = evaluatedReq,
+                        messagesByChapter = planner.messagesByChapter + (activeChapterId to (existingMsgs + auditNote)),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun applyApprovedPermissionChange() {
+        _uiState.update { state ->
+            val planner = state.tutorPlannerState
+            val req = planner.activePermissionRequest ?: return@update state
+            if (req.phase != PermissionVerdictPhase.APPROVED) return@update state
+
+            val updatedBlocks = when (req.action) {
+                PermissionRequestAction.DELETE_BLOCK -> {
+                    planner.blocks.filterNot { it.id == req.targetBlockId }
+                }
+
+                PermissionRequestAction.EDIT_BLOCK -> {
+                    planner.blocks.map { blk ->
+                        if (blk.id == req.targetBlockId) {
+                            blk.copy(
+                                title = req.proposedTitle.ifBlank { blk.title },
+                                category = req.proposedCategory,
+                                startMinutes = req.proposedStartMinutes,
+                                durationMinutes = req.proposedDurationMinutes,
+                                approvalStatus = PlannerApprovalStatus.AI_APPROVED,
+                            )
+                        } else {
+                            blk
+                        }
+                    }.sortedBy { it.startMinutes }
+                }
+
+                PermissionRequestAction.ADD_BLOCK -> {
+                    val mood = when (req.proposedCategory) {
+                        PlannerBlockCategory.STUDY -> AccentMood.CYAN
+                        PlannerBlockCategory.REVISION -> AccentMood.VIOLET
+                        PlannerBlockCategory.QUIZ -> AccentMood.AMBER
+                        PlannerBlockCategory.FLASHCARDS -> AccentMood.EMERALD
+                        PlannerBlockCategory.BREAK_MEAL -> AccentMood.EMERALD
+                    }
+                    val newBlock = PlannerBlock(
+                        id = "blk_ai_${System.nanoTime()}",
+                        title = req.proposedTitle.ifBlank { "AI-Approved Study Block" },
+                        subtitle = req.reasonText.ifBlank { "Added via AI Schedule Permission Gate" },
+                        category = req.proposedCategory,
+                        subjectName = req.proposedCategory.label,
+                        accentMood = mood,
+                        startMinutes = req.proposedStartMinutes,
+                        durationMinutes = req.proposedDurationMinutes,
+                        isCompleted = false,
+                        isCriticalPriority = false,
+                        approvalStatus = PlannerApprovalStatus.AI_APPROVED,
+                    )
+                    (planner.blocks + newBlock).sortedBy { it.startMinutes }
+                }
+            }
+
+            state.copy(
+                tutorPlannerState = planner.copy(
+                    blocks = updatedBlocks,
+                    activePermissionRequest = null,
+                ),
+            )
+        }
+    }
+
+    fun acceptPermissionCounterProposal() {
+        _uiState.update { state ->
+            val planner = state.tutorPlannerState
+            val req = planner.activePermissionRequest ?: return@update state
+            val counter = req.counterProposal ?: return@update state
+
+            val updatedBlocks = if (req.targetBlockId != null) {
+                planner.blocks.map { blk ->
+                    if (blk.id == req.targetBlockId) {
+                        blk.copy(
+                            title = counter.title,
+                            category = counter.category,
+                            startMinutes = counter.startMinutes,
+                            durationMinutes = counter.durationMinutes,
+                            approvalStatus = PlannerApprovalStatus.AI_APPROVED,
+                        )
+                    } else {
+                        blk
+                    }
+                }.sortedBy { it.startMinutes }
+            } else {
+                val mood = when (counter.category) {
+                    PlannerBlockCategory.STUDY -> AccentMood.CYAN
+                    PlannerBlockCategory.REVISION -> AccentMood.VIOLET
+                    PlannerBlockCategory.QUIZ -> AccentMood.AMBER
+                    PlannerBlockCategory.FLASHCARDS -> AccentMood.EMERALD
+                    PlannerBlockCategory.BREAK_MEAL -> AccentMood.EMERALD
+                }
+                val newBlock = PlannerBlock(
+                    id = "blk_counter_${System.nanoTime()}",
+                    title = counter.title,
+                    subtitle = counter.summary,
+                    category = counter.category,
+                    subjectName = counter.category.label,
+                    accentMood = mood,
+                    startMinutes = counter.startMinutes,
+                    durationMinutes = counter.durationMinutes,
+                    isCompleted = false,
+                    isCriticalPriority = false,
+                    approvalStatus = PlannerApprovalStatus.AI_APPROVED,
+                )
+                (planner.blocks + newBlock).sortedBy { it.startMinutes }
+            }
+
+            state.copy(
+                tutorPlannerState = planner.copy(
+                    blocks = updatedBlocks,
+                    activePermissionRequest = null,
+                ),
+            )
+        }
+    }
+
     // --- Layered Back Navigation ---
 
     fun navigateBackToHome() {
@@ -774,6 +1260,12 @@ class WorkspaceViewModel : ViewModel() {
                     state.copy(vaultState = state.vaultState.copy(openedReaderMaterialId = null))
                 state.activeTab == WorkspaceTab.VAULT && state.vaultState.previewedMaterialId != null ->
                     state.copy(vaultState = state.vaultState.copy(previewedMaterialId = null))
+                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.activePermissionRequest != null ->
+                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(activePermissionRequest = null))
+                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.isScheduleSettingsOpen ->
+                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(isScheduleSettingsOpen = false))
+                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.isCoPlanSplitEnabled ->
+                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(isCoPlanSplitEnabled = false))
                 state.activeTab != WorkspaceTab.HOME -> state.copy(activeTab = WorkspaceTab.HOME)
                 else -> state
             }
@@ -1030,6 +1522,14 @@ class WorkspaceViewModel : ViewModel() {
                 activeBucket = SpacedIntervalBucket.TODAY_X1,
                 mistakes = Phase14MockData.createInitialMistakes(),
                 selectedMistakeId = Phase14MockData.createInitialMistakes().firstOrNull()?.id,
+            ),
+            tutorPlannerState = TutorPlannerUiState(
+                activeMode = TutorPlannerMode.AI_TUTOR,
+                isCoPlanSplitEnabled = false,
+                chapters = Phase15MockData.createChapters(),
+                selectedChapterId = Phase15MockData.createChapters().first().id,
+                messagesByChapter = Phase15MockData.createInitialMessages(),
+                blocks = Phase15MockData.createInitialPlannerBlocks(),
             ),
         )
     }

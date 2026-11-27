@@ -201,4 +201,5 @@ data class WorkspaceUiState(
     val vaultState: VaultUiState,
     val revisionQuizState: RevisionQuizUiState,
     val flashcardsState: FlashcardsMistakesUiState,
+    val tutorPlannerState: TutorPlannerUiState,
 )

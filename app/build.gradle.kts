@@ -12,6 +12,11 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  // Package & Update Stability Note:
+  // Keep applicationId ("com.aistudio.ghickin.kxvqmr") and signing keystores (debug.keystore for
+  // debug builds; consistent upload keystore via KEYSTORE_PATH for release builds) unchanged across
+  // versions. Renaming applicationId splits installs, and changing signing keys causes Android's
+  // "App not installed as package conflicts with an existing package" signature-mismatch error.
   defaultConfig {
     applicationId = "com.aistudio.ghickin.kxvqmr"
     minSdk = 24

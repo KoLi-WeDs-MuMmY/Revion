@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesomeMotion
@@ -85,13 +86,19 @@ fun FlashcardsHubScreen(
     val scope = rememberCoroutineScope()
     val sentSnackbarText = stringResource(R.string.mistakes_sent_snackbar)
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("flashcards_hub_screen"),
+        contentAlignment = Alignment.TopCenter,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .widthIn(max = 1320.dp)
                 .padding(
                     horizontal = if (isWideLayout) 24.dp else 16.dp,
-                    vertical = if (isWideLayout) 16.dp else 12.dp,
+                    vertical = if (isWideLayout) 18.dp else 14.dp,
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {

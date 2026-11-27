@@ -106,12 +106,12 @@ fun RevisionQuizHubScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = "Revision & Quiz",
+                            text = stringResource(R.string.revision_hub_title),
                             style = MaterialTheme.typography.headlineMedium,
                             color = tokens.inkPrimary,
                         )
                         Text(
-                            text = "Daily synthesized digests, animated conceptual diagrams & dual-mode recall",
+                            text = stringResource(R.string.revision_hub_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = tokens.inkSecondary,
                         )
@@ -125,7 +125,7 @@ fun RevisionQuizHubScreen(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Revision & Quiz",
+                        text = stringResource(R.string.revision_hub_title),
                         style = MaterialTheme.typography.headlineMedium,
                         color = tokens.inkPrimary,
                     )

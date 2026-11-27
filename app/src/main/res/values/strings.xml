@@ -139,4 +139,52 @@
     <string name="mistakes_sent_snackbar">Added to Weekend Hard Parts flashcard deck.</string>
     <string name="mistakes_empty_title">No mistakes in this filter</string>
     <string name="mistakes_empty_subtitle">Switch category or subject filters to inspect other logged traps.</string>
+
+    <!-- Phase 1.5 Consistency: Revision & Quiz Header -->
+    <string name="revision_hub_title">Revision &amp; Quiz</string>
+    <string name="revision_hub_subtitle">Daily synthesized digests, animated conceptual diagrams &amp; dual-mode recall</string>
+
+    <!-- Phase 1.5: Chapter RAG AI Tutor & Wake-to-Sleep Daily Planner -->
+    <string name="tutor_planner_hub_title">Tutor &amp; Planner</string>
+    <string name="tutor_planner_hub_subtitle">Whole-chapter RAG doubt solver &amp; AI-guarded Wake-to-Sleep schedule</string>
+    <string name="tutor_mode_ai">AI Tutor</string>
+    <string name="tutor_mode_planner">Daily Planner</string>
+    <string name="tutor_coplan_toggle">Co-Plan Split</string>
+    <string name="tutor_coplan_active">Co-Plan Active</string>
+
+    <string name="tutor_rag_context_pill">ATTACHED WHOLE-CHAPTER RAG CONTEXT</string>
+    <string name="tutor_memory_badge_format">Persistent Memory · %1$d turns</string>
+    <string name="tutor_quick_prompts_label">QUICK CHAPTER PROMPTS</string>
+    <string name="tutor_input_placeholder">Ask a doubt from this attached chapter PDF…</string>
+    <string name="tutor_send_desc">Send doubt to Chapter RAG Tutor</string>
+    <string name="tutor_typing_status">Scanning attached chapter PDF &amp; verifying syllabus rules…</string>
+    <string name="tutor_formula_label">DERIVATION / FORMULA ANCHOR</string>
+    <string name="tutor_planner_audit_pill">AI PLANNER GUARDRAIL</string>
+
+    <string name="planner_wake_anchor">WAKE ANCHOR</string>
+    <string name="planner_sleep_anchor">SLEEP BOUNDARY</string>
+    <string name="planner_adaptive_badge">ADAPTIVE DEVICE SYNC (MOCK)</string>
+    <string name="planner_manual_badge">MANUAL BASELINE ANCHORS</string>
+    <string name="planner_settings_cta">Schedule &amp; Sync</string>
+    <string name="planner_request_add_cta">Request New Block</string>
+    <string name="planner_request_edit_cta">Request Edit</string>
+    <string name="planner_progress_title">Progress &amp; Remaining Syllabus</string>
+    <string name="planner_remaining_label">Chapters Left</string>
+    <string name="planner_completion_label">Today\'s Blocks</string>
+    <string name="planner_settings_title">Wake-to-Sleep Anchor Settings</string>
+    <string name="planner_settings_subtitle">Initial baseline set at onboarding. Adaptive sync previews how first unlock and last screen-off auto-tune your study window (OS hooks arrive in Phase 3).</string>
+    <string name="planner_adaptive_toggle_title">Auto-Adjust from Device Unlock / Screen-Off</string>
+    <string name="planner_adaptive_toggle_desc">Observed First Unlock 06:15 · Last Screen-Off 23:10 (Mock Telemetry)</string>
+
+    <string name="planner_gate_title">AI Schedule Permission Request</string>
+    <string name="planner_gate_locked_notice">Direct edits &amp; block changes are locked until AI approves against your Sleep Boundary and overdue x-1 revision rules.</string>
+    <string name="planner_gate_submit">Ask AI for Permission</string>
+    <string name="planner_gate_evaluating">AI checking Sleep Boundary, x-1 deadlines &amp; focus budget…</string>
+    <string name="planner_gate_approved_badge">AI APPROVED — EDIT UNLOCKED</string>
+    <string name="planner_gate_blocked_badge">AI BLOCKED — RULE CONFLICT</string>
+    <string name="planner_gate_apply_unlocked">Confirm &amp; Apply to Schedule</string>
+    <string name="planner_gate_accept_counter">Accept AI Counter-Proposal</string>
+    <string name="planner_gate_revise">Revise Request</string>
+    <string name="planner_snackbar_applied">AI-approved schedule update applied to today\'s timeline.</string>
+    <string name="planner_snackbar_counter">AI counter-proposal applied cleanly within your Wake-to-Sleep rules.</string>
 </resources>

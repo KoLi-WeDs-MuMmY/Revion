@@ -30,20 +30,23 @@ import com.example.model.FlashcardHubMode
 import com.example.model.FlashcardRating
 import com.example.model.InspectSelection
 import com.example.model.MistakeCategory
+import com.example.model.PermissionRequestAction
+import com.example.model.PlannerBlockCategory
 import com.example.model.PresetSubjectTemplate
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
 import com.example.model.SpacedIntervalBucket
+import com.example.model.TutorPlannerMode
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.ui.batches.BatchesScreen
 import com.example.ui.components.AmbientMineralBackdrop
 import com.example.ui.flashcards.FlashcardsHubScreen
 import com.example.ui.home.HomeCommandCenter
-import com.example.ui.placeholders.PhasePlaceholderScreen
 import com.example.ui.revision.RevisionQuizHubScreen
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
+import com.example.ui.tutor.TutorPlannerHubScreen
 import com.example.ui.vault.VaultScreen
 
 @Composable
@@ -105,6 +108,31 @@ fun WorkspaceShell(
     onSelectMistakeSubjectFilter: (String?) -> Unit,
     onSelectMistakeRecord: (String?) -> Unit,
     onSendMistakeToWeekendDeck: (String) -> Unit,
+    // Phase 1.5 Chapter RAG AI Tutor & Adaptive Wake-to-Sleep Planner callbacks
+    onSelectTutorPlannerMode: (TutorPlannerMode) -> Unit,
+    onToggleCoPlanSplit: () -> Unit,
+    onSelectRagChapter: (String) -> Unit,
+    onSendTutorDoubt: (String) -> Unit,
+    onOpenScheduleSettings: () -> Unit,
+    onCloseScheduleSettings: () -> Unit,
+    onToggleAdaptiveSync: (Boolean) -> Unit,
+    onStepManualWake: (Int) -> Unit,
+    onStepManualSleep: (Int) -> Unit,
+    onTogglePlannerBlockCompleted: (String) -> Unit,
+    onRequestAddPlannerBlock: () -> Unit,
+    onRequestEditPlannerBlock: (String) -> Unit,
+    onClosePermissionRequest: () -> Unit,
+    onUpdatePermissionDraft: (
+        action: PermissionRequestAction?,
+        title: String?,
+        category: PlannerBlockCategory?,
+        startMinutes: Int?,
+        durationMinutes: Int?,
+        reasonText: String?,
+    ) -> Unit,
+    onSubmitPermissionToAi: () -> Unit,
+    onApplyApprovedPermission: () -> Unit,
+    onAcceptCounterProposal: () -> Unit,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -199,7 +227,23 @@ fun WorkspaceShell(
                         onSelectMistakeSubjectFilter = onSelectMistakeSubjectFilter,
                         onSelectMistakeRecord = onSelectMistakeRecord,
                         onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
-                        onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
+                        onSelectTutorPlannerMode = onSelectTutorPlannerMode,
+                        onToggleCoPlanSplit = onToggleCoPlanSplit,
+                        onSelectRagChapter = onSelectRagChapter,
+                        onSendTutorDoubt = onSendTutorDoubt,
+                        onOpenScheduleSettings = onOpenScheduleSettings,
+                        onCloseScheduleSettings = onCloseScheduleSettings,
+                        onToggleAdaptiveSync = onToggleAdaptiveSync,
+                        onStepManualWake = onStepManualWake,
+                        onStepManualSleep = onStepManualSleep,
+                        onTogglePlannerBlockCompleted = onTogglePlannerBlockCompleted,
+                        onRequestAddPlannerBlock = onRequestAddPlannerBlock,
+                        onRequestEditPlannerBlock = onRequestEditPlannerBlock,
+                        onClosePermissionRequest = onClosePermissionRequest,
+                        onUpdatePermissionDraft = onUpdatePermissionDraft,
+                        onSubmitPermissionToAi = onSubmitPermissionToAi,
+                        onApplyApprovedPermission = onApplyApprovedPermission,
+                        onAcceptCounterProposal = onAcceptCounterProposal,
                     )
                 }
             }
@@ -265,7 +309,23 @@ fun WorkspaceShell(
                         onSelectMistakeSubjectFilter = onSelectMistakeSubjectFilter,
                         onSelectMistakeRecord = onSelectMistakeRecord,
                         onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
-                        onReturnHome = { onSelectTab(WorkspaceTab.HOME) },
+                        onSelectTutorPlannerMode = onSelectTutorPlannerMode,
+                        onToggleCoPlanSplit = onToggleCoPlanSplit,
+                        onSelectRagChapter = onSelectRagChapter,
+                        onSendTutorDoubt = onSendTutorDoubt,
+                        onOpenScheduleSettings = onOpenScheduleSettings,
+                        onCloseScheduleSettings = onCloseScheduleSettings,
+                        onToggleAdaptiveSync = onToggleAdaptiveSync,
+                        onStepManualWake = onStepManualWake,
+                        onStepManualSleep = onStepManualSleep,
+                        onTogglePlannerBlockCompleted = onTogglePlannerBlockCompleted,
+                        onRequestAddPlannerBlock = onRequestAddPlannerBlock,
+                        onRequestEditPlannerBlock = onRequestEditPlannerBlock,
+                        onClosePermissionRequest = onClosePermissionRequest,
+                        onUpdatePermissionDraft = onUpdatePermissionDraft,
+                        onSubmitPermissionToAi = onSubmitPermissionToAi,
+                        onApplyApprovedPermission = onApplyApprovedPermission,
+                        onAcceptCounterProposal = onAcceptCounterProposal,
                     )
                 }
 
@@ -333,7 +393,30 @@ private fun WorkspaceStage(
     onSelectMistakeSubjectFilter: (String?) -> Unit,
     onSelectMistakeRecord: (String?) -> Unit,
     onSendMistakeToWeekendDeck: (String) -> Unit,
-    onReturnHome: () -> Unit,
+    onSelectTutorPlannerMode: (TutorPlannerMode) -> Unit,
+    onToggleCoPlanSplit: () -> Unit,
+    onSelectRagChapter: (String) -> Unit,
+    onSendTutorDoubt: (String) -> Unit,
+    onOpenScheduleSettings: () -> Unit,
+    onCloseScheduleSettings: () -> Unit,
+    onToggleAdaptiveSync: (Boolean) -> Unit,
+    onStepManualWake: (Int) -> Unit,
+    onStepManualSleep: (Int) -> Unit,
+    onTogglePlannerBlockCompleted: (String) -> Unit,
+    onRequestAddPlannerBlock: () -> Unit,
+    onRequestEditPlannerBlock: (String) -> Unit,
+    onClosePermissionRequest: () -> Unit,
+    onUpdatePermissionDraft: (
+        action: PermissionRequestAction?,
+        title: String?,
+        category: PlannerBlockCategory?,
+        startMinutes: Int?,
+        durationMinutes: Int?,
+        reasonText: String?,
+    ) -> Unit,
+    onSubmitPermissionToAi: () -> Unit,
+    onApplyApprovedPermission: () -> Unit,
+    onAcceptCounterProposal: () -> Unit,
 ) {
     val spatialSpring = spring<IntOffset>(
         dampingRatio = 0.88f,
@@ -430,12 +513,26 @@ private fun WorkspaceStage(
                 onSendMistakeToWeekendDeck = onSendMistakeToWeekendDeck,
             )
 
-            else -> PhasePlaceholderScreen(
-                tab = tab,
-                activeMood = uiState.accentMood,
+            WorkspaceTab.TUTOR_PLANNER -> TutorPlannerHubScreen(
+                state = uiState.tutorPlannerState,
                 isWideLayout = isWideLayout,
-                onReturnHome = onReturnHome,
-                onCycleAccentMood = onCycleAccentMood,
+                onSelectMode = onSelectTutorPlannerMode,
+                onToggleCoPlanSplit = onToggleCoPlanSplit,
+                onSelectRagChapter = onSelectRagChapter,
+                onSendTutorDoubt = onSendTutorDoubt,
+                onOpenScheduleSettings = onOpenScheduleSettings,
+                onCloseScheduleSettings = onCloseScheduleSettings,
+                onToggleAdaptiveSync = onToggleAdaptiveSync,
+                onStepManualWake = onStepManualWake,
+                onStepManualSleep = onStepManualSleep,
+                onToggleBlockCompleted = onTogglePlannerBlockCompleted,
+                onRequestAddBlock = onRequestAddPlannerBlock,
+                onRequestEditBlock = onRequestEditPlannerBlock,
+                onClosePermissionRequest = onClosePermissionRequest,
+                onUpdatePermissionDraft = onUpdatePermissionDraft,
+                onSubmitPermissionToAi = onSubmitPermissionToAi,
+                onApplyApprovedPermission = onApplyApprovedPermission,
+                onAcceptCounterProposal = onAcceptCounterProposal,
             )
         }
     }
