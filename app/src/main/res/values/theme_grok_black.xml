@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Modular Theme 1: Grok Black (True #000000 OLED Minimalist Monochrome) -->
+    <color name="theme_grok_bg">#FF000000</color>
+    <color name="theme_grok_surface">#FF0A0A0C</color>
+    <color name="theme_grok_surface_card">#FF121215</color>
+    <color name="theme_grok_surface_elevated">#FF1B1B20</color>
+    <color name="theme_grok_track">#FF24242A</color>
+
+    <color name="theme_grok_ink_primary">#FFF5F5F7</color>
+    <color name="theme_grok_ink_secondary">#FFA1A1AA</color>
+    <color name="theme_grok_ink_muted">#FF71717A</color>
+
+    <color name="theme_grok_cta">#FFFFFFFF</color>
+    <color name="theme_grok_on_cta">#FF000000</color>
+    <color name="theme_grok_accent">#FFFFFFFF</color>
+
+    <color name="theme_grok_hairline">#1CFFFFFF</color>
+    <color name="theme_grok_hairline_subtle">#10FFFFFF</color>
+    <color name="theme_grok_hairline_specular">#2EFFFFFF</color>
+    <color name="theme_grok_error">#FFF87171</color>
+</resources>

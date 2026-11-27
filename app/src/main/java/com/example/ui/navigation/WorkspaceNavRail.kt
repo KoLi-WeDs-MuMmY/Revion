@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,13 +51,14 @@ import com.example.ui.components.GhickinMonogramMark
 import com.example.ui.components.tactileScale
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MonoBadgeStyle
-
 import com.example.ui.theme.rememberScreenLayoutMetrics
 
 @Composable
 fun GhickinNavRail(
     activeTab: WorkspaceTab,
+    isSettingsOpen: Boolean,
     onSelectTab: (WorkspaceTab) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
@@ -73,10 +77,8 @@ fun GhickinNavRail(
                 .fillMaxHeight()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 14.dp, horizontal = 8.dp),
+                .padding(vertical = 12.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             // Top GHICKIN architectural monogram mark
             val brandDesc = stringResource(R.string.nav_brand_monogram_desc)
@@ -96,13 +98,36 @@ fun GhickinNavRail(
                 )
             }
 
-            WorkspaceTab.entries.forEach { tab ->
-                NavRailDestinationItem(
-                    tab = tab,
-                    selected = tab == activeTab,
-                    onClick = { onSelectTab(tab) },
-                )
+            // Scrollable workspace destinations
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                WorkspaceTab.entries.forEach { tab ->
+                    NavRailDestinationItem(
+                        tab = tab,
+                        selected = !isSettingsOpen && tab == activeTab,
+                        onClick = { onSelectTab(tab) },
+                    )
+                }
             }
+
+            // Divider + Pinned Settings Gear Button at the bottom of the Nav Rail
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .padding(vertical = 8.dp)
+                    .height(1.dp)
+                    .background(tokens.hairlineSubtle),
+            )
+
+            NavRailSettingsItem(
+                selected = isSettingsOpen,
+                onClick = onOpenSettings,
+            )
         }
 
         // Crisp 1dp structural vertical hairline divider separating rail from stage
@@ -116,14 +141,96 @@ fun GhickinNavRail(
 }
 
 @Composable
+private fun NavRailSettingsItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val accent = tokens.themeAccent
+    val interactionSource = remember { MutableInteractionSource() }
+
+    val pillColor by animateColorAsState(
+        targetValue = if (selected) tokens.slateElevated else Color.Transparent,
+        animationSpec = spring(stiffness = 380f),
+        label = "railSettingsPill",
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (selected) accent else tokens.inkSecondary,
+        animationSpec = spring(stiffness = 380f),
+        label = "railSettingsIcon",
+    )
+    val labelColor by animateColorAsState(
+        targetValue = if (selected) tokens.inkPrimary else tokens.inkMuted,
+        animationSpec = spring(stiffness = 380f),
+        label = "railSettingsLabel",
+    )
+    val shape = RoundedCornerShape(14.dp)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("nav_rail_settings_button")
+            .minimumInteractiveComponentSize()
+            .tactileScale(interactionSource, pressedScale = 0.94f)
+            .clip(shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(color = accent.copy(alpha = 0.16f)),
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(3.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(100.dp))
+                    .background(accent),
+            )
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .width(if (selected) 52.dp else 38.dp)
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(pillColor),
+            ) {
+                Icon(
+                    imageVector = if (selected) Icons.Filled.Settings else Icons.Outlined.Settings,
+                    contentDescription = stringResource(R.string.settings_open_desc),
+                    tint = iconColor,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.settings_nav_label),
+                style = MaterialTheme.typography.labelSmall,
+                color = labelColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 private fun NavRailDestinationItem(
     tab: WorkspaceTab,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val accent = tokens.themeAccent
+    val primaryContainer = tokens.slateElevated
     val interactionSource = remember { MutableInteractionSource() }
 
     val pillWidth by animateDpAsState(
@@ -137,7 +244,7 @@ private fun NavRailDestinationItem(
         label = "railPillColor_${tab.routeId}",
     )
     val iconColor by animateColorAsState(
-        targetValue = if (selected) primary else tokens.inkSecondary,
+        targetValue = if (selected) accent else tokens.inkSecondary,
         animationSpec = spring(stiffness = 380f),
         label = "railIconColor_${tab.routeId}",
     )
@@ -163,14 +270,13 @@ private fun NavRailDestinationItem(
             .clip(itemShape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = primary.copy(alpha = 0.16f)),
+                indication = ripple(color = accent.copy(alpha = 0.16f)),
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .padding(vertical = 6.dp),
+            .padding(vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Left spring-animated active accent bar
         if (barHeight > 0.dp) {
             Box(
                 modifier = Modifier
@@ -178,19 +284,19 @@ private fun NavRailDestinationItem(
                     .width(3.dp)
                     .height(barHeight)
                     .clip(RoundedCornerShape(100.dp))
-                    .background(primary),
+                    .background(accent),
             )
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .width(pillWidth)
-                    .height(32.dp)
+                    .height(30.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(pillColor),
             ) {
@@ -198,12 +304,12 @@ private fun NavRailDestinationItem(
                     imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
                     contentDescription = tab.label,
                     tint = iconColor,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(19.dp),
                 )
             }
 
             Text(
-                text = tab.label,
+                text = tab.shortLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = labelColor,
                 maxLines = 1,
@@ -218,17 +324,18 @@ private fun NavRailDestinationItem(
 @Composable
 fun GhickinBottomNavBar(
     activeTab: WorkspaceTab,
+    isSettingsOpen: Boolean,
     onSelectTab: (WorkspaceTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
-    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val accent = tokens.themeAccent
+    val primaryContainer = tokens.slateElevated
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(tokens.amoledBackground)
+            .background(tokens.obsidianSurface)
             .navigationBarsPadding()
             .testTag("workspace_bottom_bar"),
     ) {
@@ -246,7 +353,7 @@ fun GhickinBottomNavBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             WorkspaceTab.entries.forEach { tab ->
-                val selected = tab == activeTab
+                val selected = !isSettingsOpen && tab == activeTab
                 val interactionSource = remember { MutableInteractionSource() }
                 val pillColor by animateColorAsState(
                     targetValue = if (selected) primaryContainer else Color.Transparent,
@@ -254,7 +361,7 @@ fun GhickinBottomNavBar(
                     label = "bottomPill_${tab.routeId}",
                 )
                 val iconColor by animateColorAsState(
-                    targetValue = if (selected) primary else tokens.inkSecondary,
+                    targetValue = if (selected) accent else tokens.inkSecondary,
                     animationSpec = spring(stiffness = 380f),
                     label = "bottomIcon_${tab.routeId}",
                 )
@@ -270,7 +377,7 @@ fun GhickinBottomNavBar(
                         .clip(RoundedCornerShape(12.dp))
                         .clickable(
                             interactionSource = interactionSource,
-                            indication = ripple(color = primary.copy(alpha = 0.16f)),
+                            indication = ripple(color = accent.copy(alpha = 0.16f)),
                             role = Role.Tab,
                             onClick = { onSelectTab(tab) },
                         )

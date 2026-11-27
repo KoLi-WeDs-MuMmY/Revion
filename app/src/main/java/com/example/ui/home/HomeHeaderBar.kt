@@ -1,15 +1,11 @@
 package com.example.ui.home
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,8 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.FocusMode
@@ -53,8 +48,9 @@ import com.example.ui.components.CalmStatusPulseDot
 import com.example.ui.components.KineticNumberText
 import com.example.ui.components.tactileScale
 import com.example.ui.theme.AccentMood
+import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.GhickinTokens
-import com.example.ui.theme.MonoBadgeStyle
+import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoMetricMedium
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -62,22 +58,23 @@ import com.example.ui.theme.MonoMetricMedium
 fun HomeHeaderBar(
     streakDays: Int,
     focusMode: FocusMode,
+    activeTheme: AppThemeId,
     activeMood: AccentMood,
     isWideLayout: Boolean,
     onToggleFocusMode: () -> Unit,
-    onSelectMood: (AccentMood) -> Unit,
-    onCycleMood: () -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tokens = GhickinTokens.colors
-
     if (isWideLayout) {
         Row(
             modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            GreetingBlock(modifier = Modifier.weight(1f))
+            GreetingBlock(
+                activeTheme = activeTheme,
+                modifier = Modifier.weight(1f),
+            )
             Spacer(modifier = Modifier.width(16.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -86,12 +83,16 @@ fun HomeHeaderBar(
                 StreakAndFocusPill(
                     streakDays = streakDays,
                     focusMode = focusMode,
+                    activeMood = activeMood,
                     onToggleFocusMode = onToggleFocusMode,
                 )
-                DynamicAccentSwitcher(
-                    activeMood = activeMood,
-                    onSelectMood = onSelectMood,
-                    onCycleMood = onCycleMood,
+                ActiveThemePill(
+                    activeTheme = activeTheme,
+                    onClick = onOpenSettings,
+                )
+                SettingsTopBarGearButton(
+                    testTag = "home_header_settings_button",
+                    onClick = onOpenSettings,
                 )
             }
         }
@@ -100,7 +101,21 @@ fun HomeHeaderBar(
             modifier = modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            GreetingBlock()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                GreetingBlock(
+                    activeTheme = activeTheme,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                SettingsTopBarGearButton(
+                    testTag = "home_header_settings_button",
+                    onClick = onOpenSettings,
+                )
+            }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -108,12 +123,12 @@ fun HomeHeaderBar(
                 StreakAndFocusPill(
                     streakDays = streakDays,
                     focusMode = focusMode,
+                    activeMood = activeMood,
                     onToggleFocusMode = onToggleFocusMode,
                 )
-                DynamicAccentSwitcher(
-                    activeMood = activeMood,
-                    onSelectMood = onSelectMood,
-                    onCycleMood = onCycleMood,
+                ActiveThemePill(
+                    activeTheme = activeTheme,
+                    onClick = onOpenSettings,
                 )
             }
         }
@@ -121,19 +136,25 @@ fun HomeHeaderBar(
 }
 
 @Composable
-private fun GreetingBlock(modifier: Modifier = Modifier) {
+private fun GreetingBlock(
+    activeTheme: AppThemeId,
+    modifier: Modifier = Modifier,
+) {
     val tokens = GhickinTokens.colors
-    Column(modifier = modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = stringResource(R.string.header_greeting),
             style = MaterialTheme.typography.headlineMedium,
             color = tokens.inkPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = stringResource(R.string.header_subtitle),
+            text = "${stringResource(R.string.header_subtitle)} · ${activeTheme.label}",
             style = MaterialTheme.typography.bodySmall,
             color = tokens.inkSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -142,10 +163,10 @@ private fun GreetingBlock(modifier: Modifier = Modifier) {
 private fun StreakAndFocusPill(
     streakDays: Int,
     focusMode: FocusMode,
+    activeMood: AccentMood,
     onToggleFocusMode: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
     val interactionSource = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(100.dp)
 
@@ -169,14 +190,14 @@ private fun StreakAndFocusPill(
             .clip(shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = primary.copy(alpha = 0.16f)),
+                indication = ripple(color = tokens.themeAccent.copy(alpha = 0.16f)),
                 role = Role.Button,
                 onClick = onToggleFocusMode,
             ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
         ) {
             Icon(
                 imageVector = Icons.Rounded.LocalFireDepartment,
@@ -201,8 +222,8 @@ private fun StreakAndFocusPill(
             )
             Spacer(modifier = Modifier.width(10.dp))
             CalmStatusPulseDot(
-                color = primary,
-                dotSize = 11.dp,
+                color = activeMood.accent,
+                dotSize = 10.dp,
                 durationMillis = pulseDuration,
             )
             Spacer(modifier = Modifier.width(7.dp))
@@ -223,105 +244,83 @@ private fun StreakAndFocusPill(
 }
 
 @Composable
-private fun DynamicAccentSwitcher(
-    activeMood: AccentMood,
-    onSelectMood: (AccentMood) -> Unit,
-    onCycleMood: () -> Unit,
+private fun ActiveThemePill(
+    activeTheme: AppThemeId,
+    onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val primary = MaterialTheme.colorScheme.primary
-    val cycleInteraction = remember { MutableInteractionSource() }
+    val interaction = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(100.dp)
 
     Surface(
         shape = shape,
         color = tokens.obsidianSurface,
         border = BorderStroke(1.dp, tokens.hairlineRest),
-        modifier = Modifier.testTag("dynamic_accent_switcher"),
+        modifier = Modifier
+            .testTag("home_theme_switcher_pill")
+            .minimumInteractiveComponentSize()
+            .tactileScale(interaction, pressedScale = 0.96f)
+            .clip(shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = tokens.themeAccent.copy(alpha = 0.16f)),
+                role = Role.Button,
+                onClick = onClick,
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 5.dp, bottom = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
         ) {
-            // Quick-shift cycle button
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .testTag("accent_cycle_button")
-                    .size(34.dp)
-                    .tactileScale(cycleInteraction, pressedScale = 0.92f)
-                    .clip(CircleShape)
-                    .background(tokens.carbonSurface)
-                    .clickable(
-                        interactionSource = cycleInteraction,
-                        indication = ripple(color = primary.copy(alpha = 0.2f)),
-                        role = Role.Button,
-                        onClick = onCycleMood,
-                    )
-                    .semantics {
-                        contentDescription = "Cycle dynamic accent mood"
-                    },
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Palette,
-                    contentDescription = stringResource(R.string.header_accent_cycle_desc),
-                    tint = primary,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-
-            Text(
-                text = activeMood.label.uppercase(),
-                style = MonoBadgeStyle,
-                color = tokens.inkSecondary,
-                modifier = Modifier.padding(end = 2.dp),
+            Icon(
+                imageVector = Icons.Rounded.Palette,
+                contentDescription = null,
+                tint = tokens.themeAccent,
+                modifier = Modifier.size(15.dp),
             )
+            Text(
+                text = activeTheme.label.uppercase(),
+                style = MicroTagMono,
+                color = tokens.inkPrimary,
+                maxLines = 1,
+            )
+        }
+    }
+}
 
-            AccentMood.entries.forEach { mood ->
-                val isSelected = mood == activeMood
-                val dotSize by animateDpAsState(
-                    targetValue = if (isSelected) 20.dp else 15.dp,
-                    animationSpec = spring(dampingRatio = 0.72f, stiffness = 460f),
-                    label = "swatchSize_${mood.id}",
-                )
-                val ringColor by animateColorAsState(
-                    targetValue = if (isSelected) tokens.inkPrimary else tokens.hairlineRest,
-                    animationSpec = spring(stiffness = 400f),
-                    label = "swatchRing_${mood.id}",
-                )
-                val swatchInteraction = remember { MutableInteractionSource() }
+@Composable
+fun SettingsTopBarGearButton(
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = GhickinTokens.colors
+    val interaction = remember { MutableInteractionSource() }
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .testTag("accent_swatch_${mood.id}")
-                        .size(32.dp)
-                        .tactileScale(swatchInteraction, pressedScale = 0.88f)
-                        .clip(CircleShape)
-                        .clickable(
-                            interactionSource = swatchInteraction,
-                            indication = ripple(color = mood.accent.copy(alpha = 0.25f)),
-                            role = Role.RadioButton,
-                            onClick = { onSelectMood(mood) },
-                        )
-                        .semantics {
-                            contentDescription = "Select ${mood.label} accent theme"
-                        },
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(dotSize)
-                            .clip(CircleShape)
-                            .background(mood.accent)
-                            .border(
-                                width = if (isSelected) 2.dp else 1.dp,
-                                color = ringColor,
-                                shape = CircleShape,
-                            ),
-                    )
-                }
-            }
+    Surface(
+        shape = CircleShape,
+        color = tokens.obsidianSurface,
+        border = BorderStroke(1.dp, tokens.hairlineRest),
+        modifier = modifier
+            .size(48.dp)
+            .testTag(testTag)
+            .tactileScale(interaction, pressedScale = 0.92f)
+            .clip(CircleShape)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = tokens.themeAccent.copy(alpha = 0.18f)),
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = stringResource(R.string.settings_open_desc),
+                tint = tokens.inkPrimary,
+                modifier = Modifier.size(21.dp),
+            )
         }
     }
 }

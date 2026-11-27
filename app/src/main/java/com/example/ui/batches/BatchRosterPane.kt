@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -85,9 +87,10 @@ fun BatchRosterPane(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -101,12 +104,16 @@ fun BatchRosterPane(
                         text = "Study Batches",
                         style = MaterialTheme.typography.titleMedium,
                         color = tokens.inkPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Text(
                     text = "${batches.size} ACTIVE",
                     style = MicroTagMono,
                     color = tokens.inkMuted,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
 
@@ -369,6 +376,155 @@ private fun BatchRosterTile(
                                 onDelete()
                             },
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact 9:16 portrait horizontal batch switcher strip replacing the tall sidebar roster.
+ * Eliminates text wrapping and vertical crowding on narrow portrait screens.
+ */
+@Composable
+fun PortraitBatchSelectorStrip(
+    batches: List<StudyBatch>,
+    selectedBatchId: String,
+    primaryBatchId: String,
+    onSelectBatch: (String) -> Unit,
+    onCreateBatchClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = GhickinTokens.colors
+    val createInteraction = remember { MutableInteractionSource() }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("portrait_batch_selector_strip"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "STUDY BATCHES · ${batches.size} ACTIVE",
+                style = MicroTagMono,
+                color = tokens.inkMuted,
+            )
+
+            Surface(
+                shape = RoundedCornerShape(100.dp),
+                color = tokens.primaryCta,
+                modifier = Modifier
+                    .testTag("create_custom_batch_button")
+                    .minimumInteractiveComponentSize()
+                    .tactileScale(createInteraction, pressedScale = 0.95f)
+                    .clip(RoundedCornerShape(100.dp))
+                    .clickable(
+                        interactionSource = createInteraction,
+                        indication = ripple(color = tokens.onPrimaryCta.copy(alpha = 0.2f)),
+                        role = Role.Button,
+                        onClick = onCreateBatchClick,
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = tokens.onPrimaryCta,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "New Batch",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = tokens.onPrimaryCta,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(items = batches, key = { it.id }) { batch ->
+                val selected = batch.id == selectedBatchId
+                val isPrimary = batch.id == primaryBatchId
+                val interaction = remember { MutableInteractionSource() }
+                val bgColor by animateColorAsState(
+                    targetValue = if (selected) tokens.slateElevated else tokens.obsidianSurface,
+                    animationSpec = spring(stiffness = 400f),
+                    label = "portraitBatchChipBg_${batch.id}",
+                )
+                val borderColor by animateColorAsState(
+                    targetValue = if (selected) tokens.themeAccent else tokens.hairlineRest,
+                    animationSpec = spring(stiffness = 400f),
+                    label = "portraitBatchChipBorder_${batch.id}",
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = bgColor,
+                    border = BorderStroke(if (selected) 1.5.dp else 1.dp, borderColor),
+                    modifier = Modifier
+                        .testTag("batch_tile_${batch.id}")
+                        .minimumInteractiveComponentSize()
+                        .tactileScale(interaction, pressedScale = 0.96f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = ripple(color = tokens.themeAccent.copy(alpha = 0.16f)),
+                            role = Role.Tab,
+                            onClick = { onSelectBatch(batch.id) },
+                        ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(batch.accentMood.accent),
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = batch.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = tokens.inkPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (isPrimary) {
+                                    Text(
+                                        text = "★",
+                                        style = MonoBadgeStyle,
+                                        color = tokens.themeAccent,
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "${batch.overallProgressPercent}% · ${batch.subjects.size} subjects",
+                                style = MicroTagMono,
+                                color = tokens.inkSecondary,
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }

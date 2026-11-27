@@ -74,11 +74,11 @@ import com.example.ui.components.ObsidianCard
 import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
 import com.example.ui.theme.AccentMood
+import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.FlashcardPromptDisplay
 import com.example.ui.theme.FormulaMonoDisplay
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.HumanistReadingBody
-import com.example.ui.theme.InkOnAccentDark
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 import com.example.ui.theme.MonoMetricMedium
@@ -87,6 +87,7 @@ import com.example.ui.theme.rememberScreenLayoutMetrics
 @Composable
 fun TodayRevisionPage(
     state: HomeCommandState,
+    appTheme: AppThemeId,
     isWideLayout: Boolean,
     onBackToHome: () -> Unit,
     onMarkComplete: () -> Unit,
@@ -96,7 +97,7 @@ fun TodayRevisionPage(
 
     val tokens = GhickinTokens.colors
     val metrics = rememberScreenLayoutMetrics()
-    val emerald = AccentMood.EMERALD.accent
+    val emerald = tokens.semanticSuccess
 
     Box(
         modifier = modifier
@@ -129,12 +130,12 @@ fun TodayRevisionPage(
                 item(key = "revision_hero_banner") {
                     StaggeredEntrance(delayMillis = 0L) {
                         DailyEditorialBanner(
-                            drawableRes = R.drawable.img_today_revision_art,
+                            drawableRes = appTheme.revisionArtworkRes,
                             contentDesc = stringResource(R.string.home_today_revision_title),
                             eyebrow = "YESTERDAY'S AI SYNTHESIS · ${state.todayRevisionTakeaways.size} HIGH-YIELD TAKEAWAYS",
                             headline = "Focused Active-Recall Digest",
                             caption = "Distilled strictly from yesterday's logged lectures and automatically archived under Vault → Revision.",
-                            accentColor = tokens.inkSecondary,
+                            accentColor = tokens.themeAccent,
                         )
                     }
                 }
@@ -211,6 +212,7 @@ fun TodayRevisionPage(
 @Composable
 fun TodayFlashcardsPage(
     state: HomeCommandState,
+    appTheme: AppThemeId,
     isWideLayout: Boolean,
     onBackToHome: () -> Unit,
     onFlipCard: () -> Unit,
@@ -222,7 +224,7 @@ fun TodayFlashcardsPage(
 
     val tokens = GhickinTokens.colors
     val metrics = rememberScreenLayoutMetrics()
-    val emerald = AccentMood.EMERALD.accent
+    val emerald = tokens.semanticSuccess
     val cards = state.todayFlashcards
     val activeCard = state.currentDailyFlashcard
     val currentIndex = state.activeFlashcardIndex.coerceIn(0, (cards.size - 1).coerceAtLeast(0))
@@ -266,7 +268,7 @@ fun TodayFlashcardsPage(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.img_today_flashcards_art),
+                        painter = painterResource(id = appTheme.flashcardsArtworkRes),
                         contentDescription = stringResource(R.string.home_today_flashcards_title),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -462,7 +464,7 @@ private fun DailyPageTopBar(
     backButtonTag: String,
 ) {
     val tokens = GhickinTokens.colors
-    val emerald = AccentMood.EMERALD.accent
+    val emerald = tokens.semanticSuccess
     val backInteraction = remember { MutableInteractionSource() }
 
     Row(

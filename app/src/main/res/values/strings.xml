@@ -12,7 +12,7 @@
 
     <!-- Header & Dynamic Accent -->
     <string name="header_greeting">Good morning, Scholar</string>
-    <string name="header_subtitle">16:9 AMOLED Study Command Center</string>
+    <string name="header_subtitle">Study Command Center</string>
     <string name="header_streak_label">14d Streak</string>
     <string name="header_focus_ready">AI Focus Ready</string>
     <string name="header_focus_calm">Deep Review Active</string>
@@ -259,4 +259,21 @@
     <string name="vault_recents_notes_label">RECENT CLASS NOTES</string>
     <string name="vault_recents_flashcards_label">RECENT FLASHCARDS</string>
     <string name="vault_recents_revision_label">RECENT REVISION</string>
+
+    <!-- Phase 1.6.1.2: Settings, Modular Themes & Real Home Analytics -->
+    <string name="settings_title">Appearance &amp; Settings</string>
+    <string name="settings_subtitle">Modular XML themes, typography systems &amp; display posture</string>
+    <string name="settings_open_desc">Open Appearance and Settings</string>
+    <string name="settings_nav_label">Settings</string>
+    <string name="settings_themes_section_title">Workspace Themes</string>
+    <string name="settings_themes_section_desc">Each theme loads its own dedicated XML palette, font pairing &amp; daily card art</string>
+    <string name="settings_dot_accent_section_title">Subject Indicator Accents</string>
+    <string name="settings_dot_accent_section_desc">Subtle mineral highlight used for focus pulse and subject dots</string>
+    <string name="settings_posture_section_title">Adaptive Display Posture</string>
+
+    <string name="home_analytics_lectures_title">Lectures Completed</string>
+    <string name="home_analytics_readiness_title">Daily Recall Readiness</string>
+    <string name="home_analytics_remaining_format">%1$d remaining in batch</string>
+    <string name="home_analytics_all_done_label">All batch lectures finished</string>
+    <string name="home_analytics_gate_status_format">%1$d/2 daily gates · %2$d cards in batch</string>
 </resources>

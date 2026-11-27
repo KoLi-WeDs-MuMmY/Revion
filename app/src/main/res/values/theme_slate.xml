@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Modular Theme 4: Slate (Deep Graphite Studio, Crisp Chalk Ink & Restrained Slate-Blue Accents) -->
+    <color name="theme_slate_bg">#FF0D1117</color>
+    <color name="theme_slate_surface">#FF151B23</color>
+    <color name="theme_slate_surface_card">#FF1C2430</color>
+    <color name="theme_slate_surface_elevated">#FF253040</color>
+    <color name="theme_slate_track">#FF303E52</color>
+
+    <color name="theme_slate_ink_primary">#FFE6EDF3</color>
+    <color name="theme_slate_ink_secondary">#FF9BA7B4</color>
+    <color name="theme_slate_ink_muted">#FF6E7B8A</color>
+
+    <color name="theme_slate_cta">#FF79B8FF</color>
+    <color name="theme_slate_on_cta">#FF0A111A</color>
+    <color name="theme_slate_accent">#FF79B8FF</color>
+
+    <color name="theme_slate_hairline">#22E6EDF3</color>
+    <color name="theme_slate_hairline_subtle">#12E6EDF3</color>
+    <color name="theme_slate_hairline_specular">#3879B8FF</color>
+    <color name="theme_slate_error">#FFF97583</color>
+</resources>

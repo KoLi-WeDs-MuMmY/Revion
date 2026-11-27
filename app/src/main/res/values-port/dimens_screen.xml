@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dedicated 9:16 Portrait Screen Layout Configuration -->
+    <dimen name="screen_horizontal_padding">16dp</dimen>
+    <dimen name="screen_vertical_padding">14dp</dimen>
+    <dimen name="section_spacing">14dp</dimen>
+    <dimen name="card_padding">16dp</dimen>
+    <dimen name="card_corner_radius">20dp</dimen>
+    <dimen name="daily_card_height">182dp</dimen>
+    <dimen name="hero_banner_height">148dp</dimen>
+    <dimen name="nav_rail_width">84dp</dimen>
+    <dimen name="max_content_width">680dp</dimen>
+
+    <integer name="vault_subject_columns">1</integer>
+    <integer name="vault_chapter_columns">1</integer>
+    <bool name="is_landscape_16_9">false</bool>
+</resources>

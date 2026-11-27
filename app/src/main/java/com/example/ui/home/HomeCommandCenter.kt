@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,12 +34,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.AutoGraph
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.DailyPageRoute
 import com.example.model.HomeCommandState
+import com.example.model.HomeLiveAnalytics
 import com.example.model.StudyBatch
 import com.example.model.WorkspaceUiState
 import com.example.ui.components.AnimatedLinearProgressBar
@@ -79,18 +81,15 @@ import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
-import com.example.ui.theme.InkOnAccentDark
-import com.example.ui.theme.KineticDisplayLarge
-import com.example.ui.theme.KineticDisplayXL
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
-import com.example.ui.theme.MonoMetricMedium
 import com.example.ui.theme.rememberScreenLayoutMetrics
 
 @Composable
 fun HomeCommandCenter(
     uiState: WorkspaceUiState,
     isWideLayout: Boolean,
+    onOpenSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
     onSelectAccentMood: (AccentMood) -> Unit,
     onCycleAccentMood: () -> Unit,
@@ -121,6 +120,7 @@ fun HomeCommandCenter(
         when (dailyRoute) {
             DailyPageRoute.TODAY_REVISION -> TodayRevisionPage(
                 state = homeState,
+                appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
                 onBackToHome = onCloseDailyPage,
                 onMarkComplete = onCompleteTodayRevision,
@@ -128,6 +128,7 @@ fun HomeCommandCenter(
 
             DailyPageRoute.TODAY_FLASHCARDS -> TodayFlashcardsPage(
                 state = homeState,
+                appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
                 onBackToHome = onCloseDailyPage,
                 onFlipCard = onFlipDailyFlashcard,
@@ -138,9 +139,8 @@ fun HomeCommandCenter(
             null -> HomeCommandCanvas(
                 uiState = uiState,
                 isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
                 onToggleFocusMode = onToggleFocusMode,
-                onSelectAccentMood = onSelectAccentMood,
-                onCycleAccentMood = onCycleAccentMood,
                 onCyclePrimaryBatch = onCyclePrimaryBatch,
                 onOpenDailyPage = onOpenDailyPage,
                 onToggleTodayRevisionCompleted = onToggleTodayRevisionCompleted,
@@ -156,9 +156,8 @@ fun HomeCommandCenter(
 private fun HomeCommandCanvas(
     uiState: WorkspaceUiState,
     isWideLayout: Boolean,
+    onOpenSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
-    onSelectAccentMood: (AccentMood) -> Unit,
-    onCycleAccentMood: () -> Unit,
     onCyclePrimaryBatch: () -> Unit,
     onOpenDailyPage: (DailyPageRoute) -> Unit,
     onToggleTodayRevisionCompleted: () -> Unit,
@@ -166,10 +165,23 @@ private fun HomeCommandCanvas(
     onToggleStudyGateTestOverride: () -> Unit,
     onStartTodaysNewStudy: () -> Unit,
 ) {
+    val tokens = GhickinTokens.colors
     val primaryBatch = uiState.primaryBatch
     val homeState = uiState.homeCommandState
+    val analytics = uiState.liveHomeAnalytics
     val metrics = rememberScreenLayoutMetrics()
     var showLockedReminder by remember { mutableStateOf(false) }
+
+    val remainingLabel = if (analytics.remainingLectures > 0) {
+        stringResource(R.string.home_analytics_remaining_format, analytics.remainingLectures)
+    } else {
+        stringResource(R.string.home_analytics_all_done_label)
+    }
+    val readinessSubtitle = stringResource(
+        R.string.home_analytics_gate_status_format,
+        analytics.dailyGatesCleared,
+        analytics.batchFlashcardCount,
+    )
 
     Box(
         modifier = Modifier
@@ -192,18 +204,18 @@ private fun HomeCommandCanvas(
                     HomeHeaderBar(
                         streakDays = uiState.streakDays,
                         focusMode = uiState.focusMode,
+                        activeTheme = uiState.appTheme,
                         activeMood = uiState.accentMood,
                         isWideLayout = isWideLayout,
                         onToggleFocusMode = onToggleFocusMode,
-                        onSelectMood = onSelectAccentMood,
-                        onCycleMood = onCycleAccentMood,
+                        onOpenSettings = onOpenSettings,
                     )
                 }
             }
 
-            // Row 1: Primary Batch Syllabus Progress + Clean Growth Stat Cards
+            // Section 1: Primary Batch Syllabus Overview + Live Computed Analytics
             item(key = "home_primary_and_stats") {
-                StaggeredEntrance(delayMillis = 55L) {
+                StaggeredEntrance(delayMillis = 50L) {
                     if (isWideLayout) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -212,7 +224,9 @@ private fun HomeCommandCanvas(
                         ) {
                             PrimaryBatchSyllabusCard(
                                 batch = primaryBatch,
+                                analytics = analytics,
                                 batchCount = uiState.batchesState.batches.size,
+                                isWideLayout = true,
                                 onCyclePrimaryBatch = onCyclePrimaryBatch,
                                 modifier = Modifier.weight(0.60f),
                             )
@@ -220,21 +234,23 @@ private fun HomeCommandCanvas(
                                 modifier = Modifier.weight(0.40f),
                                 verticalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
-                                GrowthMetricCard(
-                                    title = stringResource(R.string.home_stat_improvement),
-                                    metricValue = homeState.improvementPercentDelta,
-                                    subtitle = homeState.improvementSubtitle,
-                                    accentColor = AccentMood.EMERALD.accent,
-                                    icon = Icons.AutoMirrored.Rounded.TrendingUp,
-                                    testTag = "home_stat_improvement_card",
+                                LiveAnalyticsMetricCard(
+                                    title = stringResource(R.string.home_analytics_lectures_title),
+                                    metricValue = "${analytics.completedLectures}/${analytics.totalLectures}",
+                                    subtitle = remainingLabel,
+                                    progressPercent = analytics.masteryPercent,
+                                    accentColor = tokens.themeAccent,
+                                    icon = Icons.Rounded.MenuBook,
+                                    testTag = "home_stat_lectures_card",
                                 )
-                                GrowthMetricCard(
-                                    title = stringResource(R.string.home_stat_syllabus_gain),
-                                    metricValue = homeState.syllabusCoverageGainPercent,
-                                    subtitle = homeState.syllabusGainSubtitle,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    icon = Icons.Rounded.AutoGraph,
-                                    testTag = "home_stat_syllabus_gain_card",
+                                LiveAnalyticsMetricCard(
+                                    title = stringResource(R.string.home_analytics_readiness_title),
+                                    metricValue = "${analytics.dailyRecallReadinessPercent}%",
+                                    subtitle = readinessSubtitle,
+                                    progressPercent = analytics.dailyRecallReadinessPercent,
+                                    accentColor = tokens.semanticSuccess,
+                                    icon = Icons.Rounded.Bolt,
+                                    testTag = "home_stat_readiness_card",
                                 )
                             }
                         }
@@ -242,29 +258,35 @@ private fun HomeCommandCanvas(
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             PrimaryBatchSyllabusCard(
                                 batch = primaryBatch,
+                                analytics = analytics,
                                 batchCount = uiState.batchesState.batches.size,
+                                isWideLayout = false,
                                 onCyclePrimaryBatch = onCyclePrimaryBatch,
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                GrowthMetricCard(
-                                    title = stringResource(R.string.home_stat_improvement),
-                                    metricValue = homeState.improvementPercentDelta,
-                                    subtitle = homeState.improvementSubtitle,
-                                    accentColor = AccentMood.EMERALD.accent,
-                                    icon = Icons.AutoMirrored.Rounded.TrendingUp,
-                                    testTag = "home_stat_improvement_card",
+                                LiveAnalyticsMetricCard(
+                                    title = stringResource(R.string.home_analytics_lectures_title),
+                                    metricValue = "${analytics.completedLectures}/${analytics.totalLectures}",
+                                    subtitle = remainingLabel,
+                                    progressPercent = analytics.masteryPercent,
+                                    accentColor = tokens.themeAccent,
+                                    icon = Icons.Rounded.MenuBook,
+                                    testTag = "home_stat_lectures_card",
+                                    compact = true,
                                     modifier = Modifier.weight(1f),
                                 )
-                                GrowthMetricCard(
-                                    title = stringResource(R.string.home_stat_syllabus_gain),
-                                    metricValue = homeState.syllabusCoverageGainPercent,
-                                    subtitle = homeState.syllabusGainSubtitle,
-                                    accentColor = MaterialTheme.colorScheme.primary,
-                                    icon = Icons.Rounded.AutoGraph,
-                                    testTag = "home_stat_syllabus_gain_card",
+                                LiveAnalyticsMetricCard(
+                                    title = stringResource(R.string.home_analytics_readiness_title),
+                                    metricValue = "${analytics.dailyRecallReadinessPercent}%",
+                                    subtitle = readinessSubtitle,
+                                    progressPercent = analytics.dailyRecallReadinessPercent,
+                                    accentColor = tokens.semanticSuccess,
+                                    icon = Icons.Rounded.Bolt,
+                                    testTag = "home_stat_readiness_card",
+                                    compact = true,
                                     modifier = Modifier.weight(1f),
                                 )
                             }
@@ -273,9 +295,12 @@ private fun HomeCommandCanvas(
                 }
             }
 
-            // Row 2: Materialized Illustrated Cards — Today's Revision & Today's Flashcards
+            // Section 2: Theme-Matched Daily Cards — Today's Revision & Today's Flashcards
             item(key = "home_daily_cards") {
-                StaggeredEntrance(delayMillis = 110L) {
+                StaggeredEntrance(delayMillis = 100L) {
+                    val revArtwork = uiState.appTheme.revisionArtworkRes
+                    val cardsArtwork = uiState.appTheme.flashcardsArtworkRes
+
                     if (isWideLayout) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -285,8 +310,8 @@ private fun HomeCommandCanvas(
                                 title = stringResource(R.string.home_today_revision_title),
                                 subtitle = stringResource(R.string.home_from_yesterday_ai),
                                 itemCountLabel = "${homeState.todayRevisionTakeaways.size} Takeaways",
-                                artworkRes = R.drawable.img_today_revision_art,
-                                accentColor = AccentMood.CYAN.accent,
+                                artworkRes = revArtwork,
+                                accentColor = tokens.themeAccent,
                                 isCompleted = homeState.todayRevisionCompleted,
                                 testTag = "home_today_revision_card",
                                 onClick = { onOpenDailyPage(DailyPageRoute.TODAY_REVISION) },
@@ -296,7 +321,7 @@ private fun HomeCommandCanvas(
                                 title = stringResource(R.string.home_today_flashcards_title),
                                 subtitle = stringResource(R.string.home_from_yesterday_ai),
                                 itemCountLabel = "${homeState.todayFlashcards.size} Recall Cards",
-                                artworkRes = R.drawable.img_today_flashcards_art,
+                                artworkRes = cardsArtwork,
                                 accentColor = AccentMood.AMBER.accent,
                                 isCompleted = homeState.todayFlashcardsCompleted,
                                 testTag = "home_today_flashcards_card",
@@ -310,8 +335,8 @@ private fun HomeCommandCanvas(
                                 title = stringResource(R.string.home_today_revision_title),
                                 subtitle = stringResource(R.string.home_from_yesterday_ai),
                                 itemCountLabel = "${homeState.todayRevisionTakeaways.size} Takeaways",
-                                artworkRes = R.drawable.img_today_revision_art,
-                                accentColor = AccentMood.CYAN.accent,
+                                artworkRes = revArtwork,
+                                accentColor = tokens.themeAccent,
                                 isCompleted = homeState.todayRevisionCompleted,
                                 testTag = "home_today_revision_card",
                                 onClick = { onOpenDailyPage(DailyPageRoute.TODAY_REVISION) },
@@ -320,7 +345,7 @@ private fun HomeCommandCanvas(
                                 title = stringResource(R.string.home_today_flashcards_title),
                                 subtitle = stringResource(R.string.home_from_yesterday_ai),
                                 itemCountLabel = "${homeState.todayFlashcards.size} Recall Cards",
-                                artworkRes = R.drawable.img_today_flashcards_art,
+                                artworkRes = cardsArtwork,
                                 accentColor = AccentMood.AMBER.accent,
                                 isCompleted = homeState.todayFlashcardsCompleted,
                                 testTag = "home_today_flashcards_card",
@@ -331,9 +356,9 @@ private fun HomeCommandCanvas(
                 }
             }
 
-            // Row 3: Honest Study Gate Lock Bar + Start Today's New Study CTA
+            // Section 3: Honest Study Gate Lock Bar + Start Today's New Study CTA
             item(key = "home_study_gate") {
-                StaggeredEntrance(delayMillis = 165L) {
+                StaggeredEntrance(delayMillis = 150L) {
                     StudyGateControlBar(
                         homeState = homeState,
                         primaryBatchName = primaryBatch.name,
@@ -369,7 +394,9 @@ private fun HomeCommandCanvas(
 @Composable
 private fun PrimaryBatchSyllabusCard(
     batch: StudyBatch,
+    analytics: HomeLiveAnalytics,
     batchCount: Int,
+    isWideLayout: Boolean,
     onCyclePrimaryBatch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -382,8 +409,8 @@ private fun PrimaryBatchSyllabusCard(
             .fillMaxWidth()
             .testTag("home_primary_batch_card"),
         containerColor = tokens.obsidianSurface,
-        cornerRadius = 20.dp,
-        contentPadding = PaddingValues(20.dp),
+        cornerRadius = 22.dp,
+        contentPadding = PaddingValues(if (isWideLayout) 22.dp else 18.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
@@ -392,6 +419,7 @@ private fun PrimaryBatchSyllabusCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -415,6 +443,7 @@ private fun PrimaryBatchSyllabusCard(
                                 text = stringResource(R.string.home_primary_batch_tag),
                                 style = MicroTagMono,
                                 color = tokens.inkPrimary,
+                                maxLines = 1,
                             )
                         }
                     }
@@ -422,10 +451,13 @@ private fun PrimaryBatchSyllabusCard(
                         text = batch.goalTag.uppercase(),
                         style = MicroTagMono,
                         color = tokens.inkMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
 
                 if (batchCount > 1) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = tokens.carbonSurface,
@@ -437,7 +469,7 @@ private fun PrimaryBatchSyllabusCard(
                             .clip(RoundedCornerShape(10.dp))
                             .clickable(
                                 interactionSource = switchInteraction,
-                                indication = ripple(color = batchAccent.copy(alpha = 0.16f)),
+                                indication = ripple(color = tokens.themeAccent.copy(alpha = 0.16f)),
                                 role = Role.Button,
                                 onClick = onCyclePrimaryBatch,
                             ),
@@ -457,6 +489,7 @@ private fun PrimaryBatchSyllabusCard(
                                 text = stringResource(R.string.home_switch_batch),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = tokens.inkPrimary,
+                                maxLines = 1,
                             )
                         }
                     }
@@ -470,36 +503,38 @@ private fun PrimaryBatchSyllabusCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Text(
                         text = batch.name,
                         style = MaterialTheme.typography.headlineSmall,
                         color = tokens.inkPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = "${stringResource(R.string.home_syllabus_coverage)} · ${batch.completedChapters}/${batch.totalChapters} chapters · ${batch.totalHoursLogged}h logged",
+                        text = "${analytics.completedChapters}/${analytics.totalChapters} chapters · ${analytics.completedLectures}/${analytics.totalLectures} lectures done",
                         style = MaterialTheme.typography.bodySmall,
                         color = tokens.inkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Row(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         KineticNumberText(
-                            targetValue = batch.overallProgressPercent,
+                            targetValue = analytics.masteryPercent,
                             suffix = "%",
-                            style = KineticDisplayXL,
+                            style = MaterialTheme.typography.displayLarge,
                             color = tokens.inkPrimary,
                         )
                         Text(
-                            text = "OF PRIMARY SYLLABUS",
+                            text = "LIVE SYLLABUS\nMASTERY",
                             style = MicroTagMono,
                             color = tokens.inkMuted,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            modifier = Modifier.padding(bottom = 7.dp),
                         )
                     }
                 }
@@ -507,50 +542,48 @@ private fun PrimaryBatchSyllabusCard(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 AnimatedMasteryRing(
-                    percentage = batch.overallProgressPercent,
-                    accentColor = batchAccent,
-                    ringSize = 82.dp,
+                    percentage = analytics.masteryPercent,
+                    accentColor = tokens.themeAccent,
+                    ringSize = if (isWideLayout) 86.dp else 76.dp,
                     strokeWidth = 6.dp,
                 )
             }
 
-            // Disciplined per-subject progress strip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                batch.subjects.take(4).forEach { subject ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(tokens.carbonSurface)
-                            .padding(horizontal = 10.dp, vertical = 9.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
+            // Disciplined per-subject progress grid (4-across in landscape, crisp 2x2 in portrait)
+            val displaySubjects = batch.subjects.take(4)
+            if (isWideLayout || displaySubjects.size <= 2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    displaySubjects.forEach { subject ->
+                        SubjectMiniProgressTile(
+                            name = subject.name,
+                            percent = subject.masteryPercent,
+                            accent = subject.accentMood.accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    displaySubjects.chunked(2).forEach { pair ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text(
-                                text = subject.name,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = tokens.inkPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = "${subject.masteryPercent}%",
-                                style = MicroTagMono,
-                                color = tokens.inkSecondary,
-                            )
+                            pair.forEach { subject ->
+                                SubjectMiniProgressTile(
+                                    name = subject.name,
+                                    percent = subject.masteryPercent,
+                                    accent = subject.accentMood.accent,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
-                        AnimatedLinearProgressBar(
-                            progressPercent = subject.masteryPercent,
-                            accentColor = subject.accentMood.accent,
-                            height = 4.dp,
-                        )
                     }
                 }
             }
@@ -559,13 +592,58 @@ private fun PrimaryBatchSyllabusCard(
 }
 
 @Composable
-private fun GrowthMetricCard(
+private fun SubjectMiniProgressTile(
+    name: String,
+    percent: Int,
+    accent: Color,
+    modifier: Modifier = Modifier,
+) {
+    val tokens = GhickinTokens.colors
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(tokens.carbonSurface)
+            .padding(horizontal = 11.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelMedium,
+                color = tokens.inkPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "$percent%",
+                style = MicroTagMono,
+                color = tokens.inkSecondary,
+            )
+        }
+        AnimatedLinearProgressBar(
+            progressPercent = percent,
+            accentColor = accent,
+            height = 4.dp,
+        )
+    }
+}
+
+@Composable
+private fun LiveAnalyticsMetricCard(
     title: String,
     metricValue: String,
     subtitle: String,
+    progressPercent: Int,
     accentColor: Color,
     icon: ImageVector,
     testTag: String,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
@@ -576,49 +654,62 @@ private fun GrowthMetricCard(
             .testTag(testTag),
         containerColor = tokens.obsidianSurface,
         cornerRadius = 20.dp,
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 15.dp else 18.dp,
+            vertical = if (compact) 15.dp else 16.dp,
+        ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = title.uppercase(),
                     style = MicroTagMono,
                     color = tokens.inkMuted,
-                )
-                Text(
-                    text = metricValue,
-                    style = KineticDisplayLarge,
-                    color = accentColor,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.inkSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(tokens.carbonSurface),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = accentColor,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(tokens.carbonSurface),
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = accentColor,
-                    modifier = Modifier.size(21.dp),
-                )
-            }
+
+            Text(
+                text = metricValue,
+                style = if (compact) MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayMedium,
+                color = tokens.inkPrimary,
+                maxLines = 1,
+            )
+
+            AnimatedLinearProgressBar(
+                progressPercent = progressPercent,
+                accentColor = accentColor,
+                height = 4.dp,
+            )
+
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = tokens.inkSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -637,12 +728,12 @@ private fun DailyIllustratedGateCard(
 ) {
     val tokens = GhickinTokens.colors
     val metrics = rememberScreenLayoutMetrics()
-    val emerald = AccentMood.EMERALD.accent
+    val successColor = tokens.semanticSuccess
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(22.dp)
 
     val borderColor by animateColorAsState(
-        targetValue = if (isCompleted) emerald.copy(alpha = 0.36f) else tokens.hairlineRest,
+        targetValue = if (isCompleted) successColor.copy(alpha = 0.42f) else tokens.hairlineRest,
         animationSpec = spring(stiffness = 380f),
         label = "dailyCardBorder_$testTag",
     )
@@ -653,48 +744,48 @@ private fun DailyIllustratedGateCard(
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier
             .fillMaxWidth()
-            .height(metrics.dailyCardHeight)
+            .heightIn(min = metrics.dailyCardHeight)
             .testTag(testTag)
             .tactileScale(interactionSource, pressedScale = 0.98f)
             .clip(shape)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(color = tokens.inkPrimary.copy(alpha = 0.14f)),
+                indication = ripple(color = tokens.themeAccent.copy(alpha = 0.14f)),
                 role = Role.Button,
                 onClick = onClick,
             ),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Custom bundled non-neon architectural artwork anchored cleanly to right half
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Theme-matched bundled artwork anchored cleanly to the right half
             Image(
                 painter = painterResource(id = artworkRes),
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth(0.56f)
-                    .fillMaxHeight()
+                    .fillMaxWidth(0.52f)
+                    .matchParentSize()
                     .align(Alignment.CenterEnd),
             )
 
-            // Smooth matte obsidian scrim ensuring crisp readability on text side
+            // Theme-matched gradient scrim for razor-sharp contrast in both dark & Paper Light themes
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(
                         Brush.horizontalGradient(
                             0.0f to tokens.obsidianSurface,
-                            0.48f to tokens.obsidianSurface.copy(alpha = 0.96f),
-                            0.78f to tokens.obsidianSurface.copy(alpha = 0.46f),
-                            1.0f to tokens.obsidianSurface.copy(alpha = 0.14f),
+                            0.48f to tokens.obsidianSurface.copy(alpha = 0.97f),
+                            0.74f to tokens.obsidianSurface.copy(alpha = 0.45f),
+                            1.0f to tokens.obsidianSurface.copy(alpha = 0.08f),
                         ),
                     ),
             )
 
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(18.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 // Top row: status pill + quiet Auto-Saved tag
                 Row(
@@ -707,7 +798,7 @@ private fun DailyIllustratedGateCard(
                         color = tokens.carbonSurface,
                         border = BorderStroke(
                             1.dp,
-                            if (isCompleted) emerald.copy(alpha = 0.38f) else tokens.hairlineRest,
+                            if (isCompleted) successColor.copy(alpha = 0.42f) else tokens.hairlineRest,
                         ),
                     ) {
                         Row(
@@ -719,7 +810,7 @@ private fun DailyIllustratedGateCard(
                                 Icon(
                                     imageVector = Icons.Rounded.CheckCircle,
                                     contentDescription = null,
-                                    tint = emerald,
+                                    tint = successColor,
                                     modifier = Modifier.size(12.dp),
                                 )
                             } else {
@@ -733,14 +824,14 @@ private fun DailyIllustratedGateCard(
                             Text(
                                 text = if (isCompleted) "COMPLETED" else "REQUIRED FIRST",
                                 style = MicroTagMono,
-                                color = if (isCompleted) emerald else tokens.inkSecondary,
+                                color = if (isCompleted) successColor else tokens.inkSecondary,
                             )
                         }
                     }
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = tokens.obsidianSurface.copy(alpha = 0.85f),
+                        color = tokens.obsidianSurface.copy(alpha = 0.90f),
                         border = BorderStroke(1.dp, tokens.hairlineSubtle),
                     ) {
                         Row(
@@ -758,6 +849,7 @@ private fun DailyIllustratedGateCard(
                                 text = stringResource(R.string.home_auto_saved_vault),
                                 style = MicroTagMono,
                                 color = tokens.inkMuted,
+                                maxLines = 1,
                             )
                         }
                     }
@@ -765,14 +857,14 @@ private fun DailyIllustratedGateCard(
 
                 // Middle title & yesterday AI context
                 Column(
-                    modifier = Modifier.fillMaxWidth(0.72f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth(0.70f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.headlineSmall,
                         color = tokens.inkPrimary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
@@ -784,15 +876,16 @@ private fun DailyIllustratedGateCard(
                     )
                 }
 
-                // Footer action cue
+                // Footer action cue — never clips
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
                     Text(
                         text = itemCountLabel,
                         style = MonoBadgeStyle,
                         color = tokens.inkPrimary,
+                        maxLines = 1,
                     )
                     Text(
                         text = "·",
@@ -802,12 +895,13 @@ private fun DailyIllustratedGateCard(
                     Text(
                         text = if (isCompleted) "Review Again" else "Open Daily Page",
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (isCompleted) emerald else accentColor,
+                        color = if (isCompleted) successColor else tokens.themeAccent,
+                        maxLines = 1,
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                         contentDescription = null,
-                        tint = if (isCompleted) emerald else accentColor,
+                        tint = if (isCompleted) successColor else tokens.themeAccent,
                         modifier = Modifier.size(15.dp),
                     )
                 }
@@ -828,11 +922,11 @@ private fun StudyGateControlBar(
     onStartNewStudyClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val emerald = AccentMood.EMERALD.accent
+    val successColor = tokens.semanticSuccess
     val unlocked = homeState.isStudyGateUnlocked
 
     val gateBorder by animateColorAsState(
-        targetValue = if (unlocked) tokens.inkPrimary.copy(alpha = 0.28f) else tokens.hairlineRest,
+        targetValue = if (unlocked) successColor.copy(alpha = 0.36f) else tokens.hairlineRest,
         animationSpec = spring(stiffness = 380f),
         label = "studyGateBorder",
     )
@@ -849,64 +943,164 @@ private fun StudyGateControlBar(
             .testTag("home_study_gate_bar"),
         containerColor = tokens.obsidianSurface,
         accentEdgeColor = gateBorder,
-        cornerRadius = 20.dp,
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        cornerRadius = 22.dp,
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (isWideLayout) {
+        if (isWideLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (unlocked) successColor.copy(alpha = 0.14f) else tokens.carbonSurface),
+                    ) {
+                        Icon(
+                            imageVector = if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = if (unlocked) successColor else tokens.inkSecondary,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (unlocked) {
+                                stringResource(R.string.home_gate_unlocked_title)
+                            } else {
+                                stringResource(R.string.home_gate_locked_title)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (unlocked) successColor else tokens.inkPrimary,
+                        )
+                        Text(
+                            text = if (unlocked) {
+                                "Next lecture ready in $primaryBatchName"
+                            } else {
+                                homeState.studyGateLockedReason
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (showLockedReminder) AccentMood.AMBER.accent else tokens.inkSecondary,
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    GateStepCheckChip(
+                        label = "Rev",
+                        done = homeState.todayRevisionCompleted,
+                        testTag = "gate_toggle_rev_chip",
+                        onClick = onToggleRevision,
+                    )
+                    GateStepCheckChip(
+                        label = "Cards",
+                        done = homeState.todayFlashcardsCompleted,
+                        testTag = "gate_toggle_cards_chip",
+                        onClick = onToggleFlashcards,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(tokens.carbonSurface)
+                            .padding(start = 10.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_gate_test_switch),
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                        )
+                        Switch(
+                            checked = unlocked,
+                            onCheckedChange = { onToggleTestOverride() },
+                            modifier = Modifier.testTag("home_study_gate_test_toggle"),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = tokens.obsidianSurface,
+                                checkedTrackColor = successColor,
+                                uncheckedThumbColor = tokens.inkSecondary,
+                                uncheckedTrackColor = tokens.obsidianSurface,
+                                uncheckedBorderColor = tokens.hairlineRest,
+                            ),
+                        )
+                    }
+                }
+
+                StartNewStudyButton(
+                    unlocked = unlocked,
+                    containerColor = ctaColor,
+                    contentColor = ctaTextColor,
+                    onClick = onStartNewStudyClick,
+                )
+            }
+        } else {
+            // Crisp, compact 9:16 portrait Study Gate layout
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // Left: Honest Gate Status & Dynamic Calm Reason
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (unlocked) successColor.copy(alpha = 0.14f) else tokens.carbonSurface),
                     ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (unlocked) emerald.copy(alpha = 0.14f) else tokens.carbonSurface),
-                        ) {
-                            Icon(
-                                imageVector = if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
-                                contentDescription = null,
-                                tint = if (unlocked) emerald else tokens.inkSecondary,
-                                modifier = Modifier.size(19.dp),
-                            )
-                        }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = if (unlocked) {
-                                    stringResource(R.string.home_gate_unlocked_title)
-                                } else {
-                                    stringResource(R.string.home_gate_locked_title)
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (unlocked) emerald else tokens.inkPrimary,
-                            )
-                            Text(
-                                text = if (unlocked) {
-                                    "Next lecture ready in $primaryBatchName"
-                                } else {
-                                    homeState.studyGateLockedReason
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (showLockedReminder) AccentMood.AMBER.accent else tokens.inkSecondary,
-                            )
-                        }
+                        Icon(
+                            imageVector = if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = if (unlocked) successColor else tokens.inkSecondary,
+                            modifier = Modifier.size(19.dp),
+                        )
                     }
-
-                    // Middle: Discrete Quick Gate Test Switch + Individual Chips
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
+                        Text(
+                            text = if (unlocked) {
+                                stringResource(R.string.home_gate_unlocked_title)
+                            } else {
+                                stringResource(R.string.home_gate_locked_title)
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (unlocked) successColor else tokens.inkPrimary,
+                        )
+                        Text(
+                            text = if (unlocked) {
+                                "Next lecture ready in $primaryBatchName"
+                            } else {
+                                homeState.studyGateLockedReason
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (showLockedReminder) AccentMood.AMBER.accent else tokens.inkSecondary,
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GateStepCheckChip(
                             label = "Rev",
                             done = homeState.todayRevisionCompleted,
@@ -919,92 +1113,38 @@ private fun StudyGateControlBar(
                             testTag = "gate_toggle_cards_chip",
                             onClick = onToggleFlashcards,
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(tokens.carbonSurface)
-                                .padding(start = 10.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.home_gate_test_switch),
-                                style = MicroTagMono,
-                                color = tokens.inkMuted,
-                            )
-                            Switch(
-                                checked = unlocked,
-                                onCheckedChange = { onToggleTestOverride() },
-                                modifier = Modifier.testTag("home_study_gate_test_toggle"),
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = InkOnAccentDark,
-                                    checkedTrackColor = emerald,
-                                    uncheckedThumbColor = tokens.inkSecondary,
-                                    uncheckedTrackColor = tokens.obsidianSurface,
-                                    uncheckedBorderColor = tokens.hairlineRest,
-                                ),
-                            )
-                        }
                     }
-
-                    // Right: Start Today's New Study CTA
-                    StartNewStudyButton(
-                        unlocked = unlocked,
-                        containerColor = ctaColor,
-                        contentColor = ctaTextColor,
-                        onClick = onStartNewStudyClick,
-                    )
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Icon(
-                            imageVector = if (unlocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
-                            contentDescription = null,
-                            tint = if (unlocked) emerald else tokens.inkSecondary,
-                            modifier = Modifier.size(19.dp),
+                        Text(
+                            text = "TEST",
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
                         )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (unlocked) {
-                                    stringResource(R.string.home_gate_unlocked_title)
-                                } else {
-                                    stringResource(R.string.home_gate_locked_title)
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (unlocked) emerald else tokens.inkPrimary,
-                            )
-                            Text(
-                                text = homeState.studyGateLockedReason,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (showLockedReminder) AccentMood.AMBER.accent else tokens.inkSecondary,
-                            )
-                        }
                         Switch(
                             checked = unlocked,
                             onCheckedChange = { onToggleTestOverride() },
                             modifier = Modifier.testTag("home_study_gate_test_toggle"),
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = InkOnAccentDark,
-                                checkedTrackColor = emerald,
+                                checkedThumbColor = tokens.obsidianSurface,
+                                checkedTrackColor = successColor,
                                 uncheckedThumbColor = tokens.inkSecondary,
                                 uncheckedTrackColor = tokens.carbonSurface,
                                 uncheckedBorderColor = tokens.hairlineRest,
                             ),
                         )
                     }
-
-                    StartNewStudyButton(
-                        unlocked = unlocked,
-                        containerColor = ctaColor,
-                        contentColor = ctaTextColor,
-                        onClick = onStartNewStudyClick,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
+
+                StartNewStudyButton(
+                    unlocked = unlocked,
+                    containerColor = ctaColor,
+                    contentColor = ctaTextColor,
+                    onClick = onStartNewStudyClick,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }
@@ -1018,13 +1158,13 @@ private fun GateStepCheckChip(
     onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val emerald = AccentMood.EMERALD.accent
+    val successColor = tokens.semanticSuccess
     val interaction = remember { MutableInteractionSource() }
 
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = if (done) emerald.copy(alpha = 0.14f) else tokens.carbonSurface,
-        border = BorderStroke(1.dp, if (done) emerald.copy(alpha = 0.36f) else tokens.hairlineSubtle),
+        color = if (done) successColor.copy(alpha = 0.14f) else tokens.carbonSurface,
+        border = BorderStroke(1.dp, if (done) successColor.copy(alpha = 0.38f) else tokens.hairlineSubtle),
         modifier = Modifier
             .testTag(testTag)
             .minimumInteractiveComponentSize()
@@ -1032,7 +1172,7 @@ private fun GateStepCheckChip(
             .clip(RoundedCornerShape(10.dp))
             .clickable(
                 interactionSource = interaction,
-                indication = ripple(color = emerald.copy(alpha = 0.16f)),
+                indication = ripple(color = successColor.copy(alpha = 0.16f)),
                 role = Role.Checkbox,
                 onClick = onClick,
             ),
@@ -1045,13 +1185,13 @@ private fun GateStepCheckChip(
             Icon(
                 imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = null,
-                tint = if (done) emerald else tokens.inkMuted,
+                tint = if (done) successColor else tokens.inkMuted,
                 modifier = Modifier.size(13.dp),
             )
             Text(
                 text = label,
                 style = MicroTagMono,
-                color = if (done) emerald else tokens.inkSecondary,
+                color = if (done) successColor else tokens.inkSecondary,
             )
         }
     }
@@ -1086,7 +1226,7 @@ private fun StartNewStudyButton(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 13.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {

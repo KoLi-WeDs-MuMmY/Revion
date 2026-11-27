@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Tune
@@ -101,6 +102,7 @@ fun PwVaultScreen(
     state: PwVaultUiState,
     batches: List<StudyBatch>,
     isWideLayout: Boolean,
+    onOpenSettings: () -> Unit,
     onCycleBatch: () -> Unit,
     onSelectSubject: (String?) -> Unit,
     onSelectChapter: (String?) -> Unit,
@@ -148,7 +150,7 @@ fun PwVaultScreen(
                 ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // 1. Clean Top Bar — Search & Filter strictly behind icon buttons
+            // 1. Clean Top Bar — Search, Filter & Settings behind clean icon buttons
             VaultCleanTopBar(
                 activeBatch = activeBatch,
                 hasMultipleBatches = batches.size > 1,
@@ -156,6 +158,7 @@ fun PwVaultScreen(
                 onCycleBatch = onCycleBatch,
                 onOpenSearch = { onOpenCommandPalette(VaultPaletteFocus.SEARCH) },
                 onOpenFilter = { onOpenCommandPalette(VaultPaletteFocus.FILTER) },
+                onOpenSettings = onOpenSettings,
             )
 
             // 2. Collapsible PW-Style Breadcrumb Trail + Category Mode Switcher
@@ -340,6 +343,7 @@ private fun VaultCleanTopBar(
     onCycleBatch: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenFilter: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val batchDot = activeBatch.accentMood.accent
@@ -431,6 +435,13 @@ private fun VaultCleanTopBar(
                 showActiveDot = hasActiveFilter,
                 testTag = "vault_open_filter_palette",
                 onClick = onOpenFilter,
+            )
+            VaultTopIconButton(
+                icon = Icons.Rounded.Settings,
+                contentDesc = stringResource(R.string.settings_open_desc),
+                showActiveDot = false,
+                testTag = "vault_open_settings_button",
+                onClick = onOpenSettings,
             )
         }
     }

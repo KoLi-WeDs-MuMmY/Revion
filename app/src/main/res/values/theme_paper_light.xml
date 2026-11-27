@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Modular Theme 3: Paper Light (Sunlit Warm Alabaster Paper, Crisp White Cards & Editorial Charcoal Ink) -->
+    <color name="theme_paper_bg">#FFF7F4EE</color>
+    <color name="theme_paper_surface">#FFFFFFFF</color>
+    <color name="theme_paper_surface_card">#FFF1ECE2</color>
+    <color name="theme_paper_surface_elevated">#FFE7E0D3</color>
+    <color name="theme_paper_track">#FFDCD4C5</color>
+
+    <color name="theme_paper_ink_primary">#FF1A1917</color>
+    <color name="theme_paper_ink_secondary">#FF57524A</color>
+    <color name="theme_paper_ink_muted">#FF827B70</color>
+
+    <color name="theme_paper_cta">#FF1A1917</color>
+    <color name="theme_paper_on_cta">#FFFDFBF7</color>
+    <color name="theme_paper_accent">#FFC4623E</color>
+
+    <color name="theme_paper_hairline">#221A1917</color>
+    <color name="theme_paper_hairline_subtle">#131A1917</color>
+    <color name="theme_paper_hairline_specular">#34C4623E</color>
+    <color name="theme_paper_error">#FFC62828</color>
+</resources>

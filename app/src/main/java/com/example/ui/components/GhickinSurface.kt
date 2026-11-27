@@ -208,7 +208,7 @@ fun GhickinMonogramMark(
     ) {
         Text(
             text = "G",
-            fontFamily = SpaceGroteskFamily,
+            fontFamily = MaterialTheme.typography.headlineSmall.fontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
             color = tokens.inkPrimary,
@@ -219,7 +219,7 @@ fun GhickinMonogramMark(
                 .padding(6.dp)
                 .size(5.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(accent),
+                .background(tokens.themeAccent),
         )
     }
 }

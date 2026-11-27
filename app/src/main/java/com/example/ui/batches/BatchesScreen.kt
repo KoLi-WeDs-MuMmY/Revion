@@ -14,13 +14,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -65,6 +69,7 @@ import com.example.ui.components.KineticNumberText
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
+import com.example.ui.home.SettingsTopBarGearButton
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MicroTagMono
@@ -78,6 +83,7 @@ fun BatchesScreen(
     primaryBatchId: String,
     activeThemeMood: AccentMood,
     isWideLayout: Boolean,
+    onOpenSettings: () -> Unit,
     onSelectBatch: (String) -> Unit,
     onSetPrimaryBatch: (String) -> Unit,
     onToggleExpandSubject: (String) -> Unit,
@@ -214,47 +220,41 @@ fun BatchesScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item(key = "batches_mobile_header") {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(
-                            text = stringResource(R.string.batches_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = tokens.inkPrimary,
-                        )
-                        Text(
-                            text = stringResource(R.string.batches_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = tokens.inkSecondary,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.batches_title),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = tokens.inkPrimary,
+                            )
+                            Text(
+                                text = stringResource(R.string.batches_subtitle),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = tokens.inkSecondary,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        SettingsTopBarGearButton(
+                            testTag = "batches_header_settings_button",
+                            onClick = onOpenSettings,
                         )
                     }
                 }
 
                 item(key = "batches_mobile_roster") {
-                    BatchRosterPane(
+                    PortraitBatchSelectorStrip(
                         batches = batchesState.batches,
                         selectedBatchId = batchesState.selectedBatchId,
                         primaryBatchId = primaryBatchId,
                         onSelectBatch = onSelectBatch,
                         onCreateBatchClick = onOpenBuilder,
-                        onSetPrimaryBatch = onSetPrimaryBatch,
-                        onEditBatchClick = { batch ->
-                            onOpenCrudDialog(
-                                BatchCrudDialog.EditBatch(
-                                    batchId = batch.id,
-                                    initialName = batch.name,
-                                    initialGoalTag = batch.goalTag,
-                                    initialTargetLabel = batch.targetDateLabel,
-                                    initialMood = batch.accentMood,
-                                ),
-                            )
-                        },
-                        onAddSubjectToBatchClick = { batch ->
-                            onOpenCrudDialog(BatchCrudDialog.AddSubject(batchId = batch.id))
-                        },
-                        onDeleteBatchClick = { batch ->
-                            onOpenCrudDialog(
-                                BatchCrudDialog.ConfirmDeleteBatch(batchId = batch.id, batchName = batch.name),
-                            )
-                        },
                     )
                 }
 
@@ -582,6 +582,7 @@ private fun BatchDetailCanvas(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BatchOverviewBanner(
     batch: StudyBatch,
@@ -744,16 +745,17 @@ private fun BatchOverviewBanner(
                 }
             }
 
-            // Bottom quick action strip: Add Subject + synced info
-            Row(
+            // Bottom quick action strip: Add Subject + synced info (wraps cleanly on portrait)
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = "${batch.subjects.size} subjects · ${batch.totalChapters} chapters · Synced with Vault",
                     style = MaterialTheme.typography.bodySmall,
                     color = tokens.inkSecondary,
+                    modifier = Modifier.align(Alignment.CenterVertically),
                 )
                 InlineAddActionChip(
                     label = stringResource(R.string.batches_add_subject_cta),

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,10 +25,30 @@ class MainActivity : ComponentActivity() {
             val workspaceViewModel: WorkspaceViewModel = viewModel()
             val uiState by workspaceViewModel.uiState.collectAsStateWithLifecycle()
 
-            GhickinTheme(accentMood = uiState.accentMood) {
+            LaunchedEffect(uiState.appTheme.isLight) {
+                if (uiState.appTheme.isLight) {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+                        navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+                    )
+                } else {
+                    enableEdgeToEdge(
+                        statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+                        navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+                    )
+                }
+            }
+
+            GhickinTheme(
+                appTheme = uiState.appTheme,
+                accentMood = uiState.accentMood,
+            ) {
                 WorkspaceShell(
                     uiState = uiState,
                     onSelectTab = workspaceViewModel::selectTab,
+                    onSelectAppTheme = workspaceViewModel::selectAppTheme,
+                    onOpenSettings = workspaceViewModel::openSettings,
+                    onCloseSettings = workspaceViewModel::closeSettings,
                     onToggleFocusMode = workspaceViewModel::toggleFocusMode,
                     onSelectAccentMood = workspaceViewModel::selectAccentMood,
                     onCycleAccentMood = workspaceViewModel::cycleAccentMood,

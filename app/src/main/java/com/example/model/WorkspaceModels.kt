@@ -187,8 +187,23 @@ sealed interface InspectSelection {
 }
 
 @Immutable
+data class HomeLiveAnalytics(
+    val completedLectures: Int,
+    val totalLectures: Int,
+    val remainingLectures: Int,
+    val masteryPercent: Int,
+    val completedChapters: Int,
+    val totalChapters: Int,
+    val dailyGatesCleared: Int,
+    val dailyRecallReadinessPercent: Int,
+    val batchFlashcardCount: Int,
+)
+
+@Immutable
 data class WorkspaceUiState(
     val activeTab: WorkspaceTab = WorkspaceTab.HOME,
+    val appTheme: com.example.ui.theme.AppThemeId = com.example.ui.theme.AppThemeId.GROK_BLACK,
+    val isSettingsOpen: Boolean = false,
     val accentMood: AccentMood = AccentMood.CYAN,
     val focusMode: FocusMode = FocusMode.AI_READY,
     val streakDays: Int = 14,
@@ -210,4 +225,39 @@ data class WorkspaceUiState(
     val primaryBatch: StudyBatch
         get() = batchesState.batches.firstOrNull { it.id == primaryBatchId }
             ?: batchesState.batches.first()
+
+    val liveHomeAnalytics: HomeLiveAnalytics
+        get() {
+            val batch = primaryBatch
+            val vaultSubjects = pwVaultState.subjectsByBatch[batch.id].orEmpty()
+            val totalLecs = if (vaultSubjects.isNotEmpty()) {
+                vaultSubjects.sumOf { it.totalLectures }
+            } else {
+                batch.subjects.sumOf { it.lectureCount }
+            }
+            val doneLecs = if (vaultSubjects.isNotEmpty()) {
+                vaultSubjects.sumOf { it.completedLectures }
+            } else {
+                batch.subjects.sumOf { it.completedLectures }
+            }
+            val remainingLecs = (totalLecs - doneLecs).coerceAtLeast(0)
+            val mastery = if (totalLecs == 0) 0 else (doneLecs * 100) / totalLecs
+            val gatesCleared = (if (homeCommandState.todayRevisionCompleted) 1 else 0) +
+                (if (homeCommandState.todayFlashcardsCompleted) 1 else 0)
+            val batchCards = vaultSubjects.sumOf { subj ->
+                subj.chapters.sumOf { it.totalFlashcards }
+            } + homeCommandState.todayFlashcards.size
+
+            return HomeLiveAnalytics(
+                completedLectures = doneLecs,
+                totalLectures = totalLecs,
+                remainingLectures = remainingLecs,
+                masteryPercent = mastery,
+                completedChapters = batch.completedChapters,
+                totalChapters = batch.totalChapters,
+                dailyGatesCleared = gatesCleared,
+                dailyRecallReadinessPercent = gatesCleared * 50,
+                batchFlashcardCount = batchCards,
+            )
+        }
 }

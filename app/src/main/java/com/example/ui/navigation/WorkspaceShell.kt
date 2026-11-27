@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import com.example.model.BatchCrudDialog
 import com.example.model.DailyPageRoute
 import com.example.model.PresetSubjectTemplate
@@ -38,15 +37,19 @@ import com.example.ui.batches.BatchesScreen
 import com.example.ui.components.AmbientMineralBackdrop
 import com.example.ui.home.HomeCommandCenter
 import com.example.ui.placeholders.PhasePlaceholderScreen
+import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.AccentMood
+import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.GhickinTokens
-import com.example.ui.theme.rememberScreenLayoutMetrics
 import com.example.ui.vault.PwVaultScreen
 
 @Composable
 fun WorkspaceShell(
     uiState: WorkspaceUiState,
     onSelectTab: (WorkspaceTab) -> Unit,
+    onSelectAppTheme: (AppThemeId) -> Unit,
+    onOpenSettings: () -> Unit,
+    onCloseSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
     onSelectAccentMood: (AccentMood) -> Unit,
     onCycleAccentMood: () -> Unit,
@@ -110,9 +113,9 @@ fun WorkspaceShell(
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val metrics = rememberScreenLayoutMetrics()
 
-    val canHandleBack = uiState.activeTab != WorkspaceTab.HOME ||
+    val canHandleBack = uiState.isSettingsOpen ||
+        uiState.activeTab != WorkspaceTab.HOME ||
         uiState.homeCommandState.activeDailyPage != null ||
         uiState.inspectSelection != null
 
@@ -125,9 +128,11 @@ fun WorkspaceShell(
             .fillMaxSize()
             .background(tokens.amoledBackground),
     ) {
-        val isWideLayout = metrics.isLandscape16By9 || maxWidth >= 640.dp || maxWidth > maxHeight
+        // Strictly orientation-driven: Portrait (height >= width, including portrait tablets)
+        // ALWAYS renders the clean 9:16 portrait layout + bottom navigation bar.
+        // Landscape (width > height) renders the 16:9 side Navigation Rail + multi-column workspace.
+        val isWideLayout = maxWidth > maxHeight
 
-        // Whisper-quiet neutral studio sheen on pure #000000 true black
         AmbientMineralBackdrop(
             accentMood = uiState.accentMood,
             modifier = Modifier.fillMaxSize(),
@@ -141,7 +146,9 @@ fun WorkspaceShell(
             ) {
                 GhickinNavRail(
                     activeTab = uiState.activeTab,
+                    isSettingsOpen = uiState.isSettingsOpen,
                     onSelectTab = onSelectTab,
+                    onOpenSettings = onOpenSettings,
                 )
 
                 Box(
@@ -158,6 +165,9 @@ fun WorkspaceShell(
                         uiState = uiState,
                         isWideLayout = true,
                         onSelectTab = onSelectTab,
+                        onSelectAppTheme = onSelectAppTheme,
+                        onOpenSettings = onOpenSettings,
+                        onCloseSettings = onCloseSettings,
                         onToggleFocusMode = onToggleFocusMode,
                         onSelectAccentMood = onSelectAccentMood,
                         onCycleAccentMood = onCycleAccentMood,
@@ -229,6 +239,9 @@ fun WorkspaceShell(
                         uiState = uiState,
                         isWideLayout = false,
                         onSelectTab = onSelectTab,
+                        onSelectAppTheme = onSelectAppTheme,
+                        onOpenSettings = onOpenSettings,
+                        onCloseSettings = onCloseSettings,
                         onToggleFocusMode = onToggleFocusMode,
                         onSelectAccentMood = onSelectAccentMood,
                         onCycleAccentMood = onCycleAccentMood,
@@ -284,6 +297,7 @@ fun WorkspaceShell(
 
                 GhickinBottomNavBar(
                     activeTab = uiState.activeTab,
+                    isSettingsOpen = uiState.isSettingsOpen,
                     onSelectTab = onSelectTab,
                 )
             }
@@ -296,6 +310,9 @@ private fun WorkspaceStage(
     uiState: WorkspaceUiState,
     isWideLayout: Boolean,
     onSelectTab: (WorkspaceTab) -> Unit,
+    onSelectAppTheme: (AppThemeId) -> Unit,
+    onOpenSettings: () -> Unit,
+    onCloseSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
     onSelectAccentMood: (AccentMood) -> Unit,
     onCycleAccentMood: () -> Unit,
@@ -359,10 +376,11 @@ private fun WorkspaceStage(
     )
 
     AnimatedContent(
-        targetState = uiState.activeTab,
+        targetState = if (uiState.isSettingsOpen) null else uiState.activeTab,
         transitionSpec = {
-            val forward = targetState.ordinal >= initialState.ordinal
-            val direction = if (forward) 1 else -1
+            val initOrd = initialState?.ordinal ?: 99
+            val targetOrd = targetState?.ordinal ?: 99
+            val direction = if (targetOrd >= initOrd) 1 else -1
             (fadeIn(animationSpec = tween(220)) +
                 slideInHorizontally(animationSpec = spatialSpring) { fullWidth ->
                     direction * (fullWidth / 14)
@@ -375,9 +393,21 @@ private fun WorkspaceStage(
         label = "workspaceStageTransition",
     ) { tab ->
         when (tab) {
+            null -> SettingsScreen(
+                activeTheme = uiState.appTheme,
+                activeMood = uiState.accentMood,
+                focusMode = uiState.focusMode,
+                isWideLayout = isWideLayout,
+                onSelectTheme = onSelectAppTheme,
+                onSelectAccentMood = onSelectAccentMood,
+                onToggleFocusMode = onToggleFocusMode,
+                onCloseSettings = onCloseSettings,
+            )
+
             WorkspaceTab.HOME -> HomeCommandCenter(
                 uiState = uiState,
                 isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
                 onToggleFocusMode = onToggleFocusMode,
                 onSelectAccentMood = onSelectAccentMood,
                 onCycleAccentMood = onCycleAccentMood,
@@ -399,6 +429,7 @@ private fun WorkspaceStage(
                 primaryBatchId = uiState.primaryBatchId,
                 activeThemeMood = uiState.accentMood,
                 isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
                 onSelectBatch = onSelectBatch,
                 onSetPrimaryBatch = onSetPrimaryBatch,
                 onToggleExpandSubject = onToggleExpandSubject,
@@ -427,6 +458,7 @@ private fun WorkspaceStage(
                 state = uiState.pwVaultState,
                 batches = uiState.batchesState.batches,
                 isWideLayout = isWideLayout,
+                onOpenSettings = onOpenSettings,
                 onCycleBatch = onCyclePrimaryBatch,
                 onSelectSubject = onSelectPwVaultSubject,
                 onSelectChapter = onSelectPwVaultChapter,

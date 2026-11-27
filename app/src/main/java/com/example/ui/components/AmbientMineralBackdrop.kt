@@ -16,21 +16,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.example.ui.theme.AccentMood
-import com.example.ui.theme.AmoledBlack
+import com.example.ui.theme.AppThemeId
+import com.example.ui.theme.GhickinTokens
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Ultra-minimal studio monochrome sheen over a true #000000 OLED canvas.
- * Removes neon fog completely while preserving whisper-quiet architectural depth.
+ * Theme-aware ambient studio sheen over the active modular theme canvas.
+ * Preserves pure #000000 OLED black in Grok Black while giving Claude Editorial,
+ * Paper Light, and Slate their own whisper-quiet architectural warmth.
  */
 @Composable
 fun AmbientMineralBackdrop(
     @Suppress("UNUSED_PARAMETER") accentMood: AccentMood,
     modifier: Modifier = Modifier,
 ) {
-    val transition = rememberInfiniteTransition(label = "monochromeAmbientDrift")
+    val tokens = GhickinTokens.colors
+    val transition = rememberInfiniteTransition(label = "themeAmbientDrift")
     val driftPhase by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -41,10 +44,23 @@ fun AmbientMineralBackdrop(
         label = "driftPhase",
     )
 
+    val sheenColor = when (tokens.activeTheme) {
+        AppThemeId.GROK_BLACK -> Color.White
+        AppThemeId.CLAUDE_EDITORIAL -> tokens.themeAccent
+        AppThemeId.PAPER_LIGHT -> tokens.themeAccent
+        AppThemeId.SLATE -> tokens.themeAccent
+    }
+    val peakAlpha = when (tokens.activeTheme) {
+        AppThemeId.GROK_BLACK -> 0.025f
+        AppThemeId.CLAUDE_EDITORIAL -> 0.045f
+        AppThemeId.PAPER_LIGHT -> 0.055f
+        AppThemeId.SLATE -> 0.04f
+    }
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .background(AmoledBlack),
+            .background(tokens.amoledBackground),
     ) {
         val w = size.width
         val h = size.height
@@ -55,14 +71,13 @@ fun AmbientMineralBackdrop(
             x = w * (0.30f + 0.10f * cos(rad).toFloat()),
             y = h * (0.14f + 0.08f * sin(rad).toFloat()),
         )
-        val subtleRadius = maxOf(w, h) * 0.52f
+        val subtleRadius = maxOf(w, h) * 0.54f
 
-        // Whisper-quiet 2.5% neutral studio light catch on true #000000 black
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.025f),
-                    Color.White.copy(alpha = 0.008f),
+                    sheenColor.copy(alpha = peakAlpha),
+                    sheenColor.copy(alpha = peakAlpha * 0.35f),
                     Color.Transparent,
                 ),
                 center = subtleCenter,

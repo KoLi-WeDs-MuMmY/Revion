@@ -54,6 +54,7 @@ import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
 import com.example.model.formatClockMinutes
 import com.example.ui.theme.AccentMood
+import com.example.ui.theme.AppThemeId
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,9 +77,22 @@ class WorkspaceViewModel : ViewModel() {
         _uiState.update { state ->
             state.copy(
                 activeTab = tab,
+                isSettingsOpen = false,
                 inspectSelection = null,
             )
         }
+    }
+
+    fun selectAppTheme(theme: AppThemeId) {
+        _uiState.update { it.copy(appTheme = theme) }
+    }
+
+    fun openSettings() {
+        _uiState.update { it.copy(isSettingsOpen = true) }
+    }
+
+    fun closeSettings() {
+        _uiState.update { it.copy(isSettingsOpen = false) }
     }
 
     fun selectAccentMood(mood: AccentMood) {
@@ -2215,6 +2229,8 @@ class WorkspaceViewModel : ViewModel() {
     fun navigateBackToHome() {
         _uiState.update { state ->
             when {
+                state.isSettingsOpen ->
+                    state.copy(isSettingsOpen = false)
                 state.homeCommandState.activeDailyPage != null ->
                     state.copy(homeCommandState = state.homeCommandState.copy(activeDailyPage = null, isActiveFlashcardFlipped = false))
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
