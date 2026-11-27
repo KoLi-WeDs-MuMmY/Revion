@@ -7,11 +7,14 @@ import com.example.model.BatchChapter
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
 import com.example.model.CounterProposal
+import com.example.model.DailyFlashcardItem
+import com.example.model.DailyPageRoute
 import com.example.model.DailyRevisionBrief
 import com.example.model.FlashcardHubMode
 import com.example.model.FlashcardRating
 import com.example.model.FlashcardsMistakesUiState
 import com.example.model.FocusMode
+import com.example.model.HomeCommandState
 import com.example.model.InspectSelection
 import com.example.model.LoggedTopic
 import com.example.model.MaterialType
@@ -22,10 +25,12 @@ import com.example.model.Phase12MockData
 import com.example.model.Phase13MockData
 import com.example.model.Phase14MockData
 import com.example.model.Phase15MockData
+import com.example.model.Phase161MockData
 import com.example.model.PlannerApprovalStatus
 import com.example.model.PlannerBlock
 import com.example.model.PlannerBlockCategory
 import com.example.model.PresetSubjectTemplate
+import com.example.model.PwVaultUiState
 import com.example.model.QuizMode
 import com.example.model.RevisionQuizTabMode
 import com.example.model.RevisionQuizUiState
@@ -37,7 +42,12 @@ import com.example.model.SubjectMastery
 import com.example.model.TutorMessage
 import com.example.model.TutorPlannerMode
 import com.example.model.TutorPlannerUiState
+import com.example.model.VaultCategorySubView
+import com.example.model.VaultChapterNode
+import com.example.model.VaultLectureNode
 import com.example.model.VaultMaterial
+import com.example.model.VaultPaletteFocus
+import com.example.model.VaultSubjectNode
 import com.example.model.VaultUiState
 import com.example.model.WorkspaceTab
 import com.example.model.WorkspaceUiState
@@ -277,6 +287,70 @@ class WorkspaceViewModel : ViewModel() {
             },
         )
 
+        val starterPwSubjects = createdSubjects.mapIndexed { sIdx, sub ->
+            val chapter = sub.chapters.first()
+            VaultSubjectNode(
+                id = "pw_${sub.id}",
+                batchId = batchId,
+                name = sub.name,
+                accentMood = sub.accentMood,
+                chapters = listOf(
+                    VaultChapterNode(
+                        id = "pw_${chapter.id}",
+                        batchId = batchId,
+                        subjectId = "pw_${sub.id}",
+                        subjectName = sub.name,
+                        subjectMood = sub.accentMood,
+                        chapterCode = "CH 0${sIdx + 1}",
+                        title = chapter.title,
+                        lectures = listOf(
+                            VaultLectureNode(
+                                id = "pw_lec_${sub.id}_01",
+                                batchId = batchId,
+                                subjectId = "pw_${sub.id}",
+                                subjectName = sub.name,
+                                subjectMood = sub.accentMood,
+                                chapterId = "pw_${chapter.id}",
+                                chapterTitle = chapter.title,
+                                lectureNumber = 1,
+                                lectureCode = "L01",
+                                title = "${sub.name} Kickoff & Core Principles",
+                                durationLabel = "1h 05m",
+                                dateLabel = "Ready to Study",
+                                isCompleted = false,
+                                notesTitle = "L01_${sub.name}_Starter_ClassNotes.pdf",
+                                notesPageCount = 14,
+                                notesSummary = "Structured starter class notes and syllabus anchors for ${sub.name} in $trimmedName.",
+                                notesHighlights = listOf(
+                                    "Key definitions and core formula sheet for ${chapter.title}",
+                                    "Indexed for whole-chapter AI Tutor RAG attachment",
+                                ),
+                                classLabel = "Class 01 · Starter Deck",
+                                flashcardDeck = listOf(
+                                    DailyFlashcardItem(
+                                        id = "fc_custom_${sub.id}_1",
+                                        subjectName = sub.name,
+                                        accentMood = sub.accentMood,
+                                        chapterTitle = chapter.title,
+                                        classLabel = "Class 01 · Starter Deck",
+                                        frontPrompt = "What is the foundational objective of ${chapter.title}?",
+                                        backAnswer = "Master core derivations and high-yield problem patterns before timed drills.",
+                                        formulaHint = "Concept Anchor → Worked Derivation → Recall",
+                                    ),
+                                ),
+                                revisionHeadline = "Foundation digest for ${chapter.title} inside $trimmedName.",
+                                revisionFormula = "${sub.name} Core Anchor · Track Blueprint",
+                                revisionKeyPoints = listOf(
+                                    "Complete Lecture 01 notes before opening problem sets",
+                                    "Attach this lecture PDF directly when asking AI Tutor doubts",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        }
+
         _uiState.update { state ->
             state.copy(
                 batchesState = state.batchesState.copy(
@@ -287,6 +361,9 @@ class WorkspaceViewModel : ViewModel() {
                 ),
                 vaultState = state.vaultState.copy(
                     materials = listOf(starterMaterial) + state.vaultState.materials,
+                ),
+                pwVaultState = state.pwVaultState.copy(
+                    subjectsByBatch = state.pwVaultState.subjectsByBatch + (batchId to starterPwSubjects),
                 ),
             )
         }
@@ -1246,26 +1323,393 @@ class WorkspaceViewModel : ViewModel() {
         }
     }
 
+    // --- Phase 1.6.1: Primary Batch Sync, Study Gate, Dedicated Daily Pages & PW-Style Vault ---
+
+    fun setPrimaryBatch(batchId: String) {
+        _uiState.update { state ->
+            val targetBatch = state.batchesState.batches.firstOrNull { it.id == batchId } ?: return@update state
+            val nextSubjects = state.pwVaultState.subjectsByBatch[batchId].orEmpty()
+            val firstSubject = nextSubjects.firstOrNull()
+            val firstChapter = firstSubject?.chapters?.firstOrNull()
+            state.copy(
+                primaryBatchId = batchId,
+                batchesState = state.batchesState.copy(
+                    selectedBatchId = batchId,
+                    expandedSubjectId = targetBatch.subjects.firstOrNull()?.id,
+                ),
+                pwVaultState = state.pwVaultState.copy(
+                    selectedBatchId = batchId,
+                    selectedSubjectId = null,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
+                    expandedClassNoteLectureId = null,
+                    expandedFlashcardChapterId = firstChapter?.id,
+                    previewFlashcardId = null,
+                    isPreviewCardFlipped = false,
+                    selectedRevisionSubjectId = firstSubject?.id,
+                    paletteFilterSubjectId = null,
+                ),
+            )
+        }
+    }
+
+    fun cyclePrimaryBatch() {
+        val state = _uiState.value
+        val batches = state.batchesState.batches
+        if (batches.size <= 1) return
+        val currentIdx = batches.indexOfFirst { it.id == state.primaryBatchId }.coerceAtLeast(0)
+        val nextBatch = batches[(currentIdx + 1) % batches.size]
+        setPrimaryBatch(nextBatch.id)
+    }
+
+    fun openDailyPage(route: DailyPageRoute) {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    activeDailyPage = route,
+                    activeFlashcardIndex = 0,
+                    isActiveFlashcardFlipped = false,
+                ),
+            )
+        }
+    }
+
+    fun closeDailyPage() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    activeDailyPage = null,
+                    isActiveFlashcardFlipped = false,
+                ),
+            )
+        }
+    }
+
+    fun completeTodayRevision() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    todayRevisionCompleted = true,
+                    activeDailyPage = null,
+                ),
+            )
+        }
+    }
+
+    fun flipDailyFlashcard() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    isActiveFlashcardFlipped = !state.homeCommandState.isActiveFlashcardFlipped,
+                ),
+            )
+        }
+    }
+
+    fun stepDailyFlashcard(delta: Int) {
+        _uiState.update { state ->
+            val count = state.homeCommandState.todayFlashcards.size.coerceAtLeast(1)
+            val nextIdx = (state.homeCommandState.activeFlashcardIndex + delta).coerceIn(0, count - 1)
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    activeFlashcardIndex = nextIdx,
+                    isActiveFlashcardFlipped = false,
+                ),
+            )
+        }
+    }
+
+    fun completeTodayFlashcards() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    todayFlashcardsCompleted = true,
+                    activeDailyPage = null,
+                    isActiveFlashcardFlipped = false,
+                ),
+            )
+        }
+    }
+
+    fun toggleTodayRevisionCompleted() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    todayRevisionCompleted = !state.homeCommandState.todayRevisionCompleted,
+                ),
+            )
+        }
+    }
+
+    fun toggleTodayFlashcardsCompleted() {
+        _uiState.update { state ->
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    todayFlashcardsCompleted = !state.homeCommandState.todayFlashcardsCompleted,
+                ),
+            )
+        }
+    }
+
+    fun toggleStudyGateTestOverride() {
+        _uiState.update { state ->
+            val nowUnlocked = !state.homeCommandState.isStudyGateUnlocked
+            state.copy(
+                homeCommandState = state.homeCommandState.copy(
+                    todayRevisionCompleted = nowUnlocked,
+                    todayFlashcardsCompleted = nowUnlocked,
+                ),
+            )
+        }
+    }
+
+    fun startTodaysNewStudy() {
+        _uiState.update { state ->
+            if (!state.homeCommandState.isStudyGateUnlocked) return@update state
+            val targetBatchId = state.primaryBatchId
+            val subjects = state.pwVaultState.subjectsByBatch[targetBatchId].orEmpty()
+            val allLectures = subjects.flatMap { s -> s.chapters.flatMap { c -> c.lectures } }
+            val nextLecture = allLectures.firstOrNull { !it.isCompleted } ?: allLectures.firstOrNull()
+            state.copy(
+                activeTab = WorkspaceTab.VAULT,
+                pwVaultState = state.pwVaultState.copy(
+                    selectedBatchId = targetBatchId,
+                    selectedSubjectId = nextLecture?.subjectId,
+                    selectedChapterId = nextLecture?.chapterId,
+                    selectedLectureId = nextLecture?.id,
+                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                    isCommandPaletteOpen = false,
+                ),
+            )
+        }
+    }
+
+    // --- PW-Style Vault Actions ---
+
+    fun selectPwVaultBatch(batchId: String) {
+        // Keep Primary Batch cohesive across Home, Batches & Vault
+        setPrimaryBatch(batchId)
+    }
+
+    fun selectPwVaultSubject(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    selectedSubjectId = subjectId,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
+                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                ),
+            )
+        }
+    }
+
+    fun selectPwVaultChapter(chapterId: String?) {
+        _uiState.update { state ->
+            val current = state.pwVaultState
+            val resolvedSubjectId = if (chapterId != null) {
+                current.subjectsForSelectedBatch
+                    .firstOrNull { subj -> subj.chapters.any { it.id == chapterId } }
+                    ?.id ?: current.selectedSubjectId
+            } else {
+                current.selectedSubjectId
+            }
+            state.copy(
+                pwVaultState = current.copy(
+                    selectedSubjectId = resolvedSubjectId,
+                    selectedChapterId = chapterId,
+                    selectedLectureId = null,
+                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                ),
+            )
+        }
+    }
+
+    fun selectPwVaultLecture(lectureId: String?) {
+        _uiState.update { state ->
+            val current = state.pwVaultState
+            val lec = current.allLecturesInBatch.firstOrNull { it.id == lectureId }
+            state.copy(
+                pwVaultState = current.copy(
+                    selectedSubjectId = lec?.subjectId ?: current.selectedSubjectId,
+                    selectedChapterId = lec?.chapterId ?: current.selectedChapterId,
+                    selectedLectureId = lectureId,
+                    activeSubView = VaultCategorySubView.HIERARCHY_BROWSE,
+                ),
+            )
+        }
+    }
+
+    fun selectPwVaultSubView(subView: VaultCategorySubView) {
+        _uiState.update { state ->
+            val current = state.pwVaultState
+            val defaultChapterId = current.expandedFlashcardChapterId
+                ?: current.selectedChapterId
+                ?: current.allChaptersInBatch.firstOrNull()?.id
+            val defaultRevSubjectId = current.selectedRevisionSubjectId
+                ?: current.selectedSubjectId
+                ?: current.subjectsForSelectedBatch.firstOrNull()?.id
+            state.copy(
+                pwVaultState = current.copy(
+                    activeSubView = subView,
+                    expandedFlashcardChapterId = defaultChapterId,
+                    selectedRevisionSubjectId = defaultRevSubjectId,
+                ),
+            )
+        }
+    }
+
+    fun toggleExpandedClassNote(lectureId: String) {
+        _uiState.update { state ->
+            val current = state.pwVaultState.expandedClassNoteLectureId
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    expandedClassNoteLectureId = if (current == lectureId) null else lectureId,
+                ),
+            )
+        }
+    }
+
+    fun toggleExpandedFlashcardChapter(chapterId: String) {
+        _uiState.update { state ->
+            val current = state.pwVaultState.expandedFlashcardChapterId
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    expandedFlashcardChapterId = if (current == chapterId) null else chapterId,
+                ),
+            )
+        }
+    }
+
+    fun selectPreviewFlashcard(cardId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    previewFlashcardId = cardId,
+                    isPreviewCardFlipped = false,
+                ),
+            )
+        }
+    }
+
+    fun flipPreviewFlashcard() {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    isPreviewCardFlipped = !state.pwVaultState.isPreviewCardFlipped,
+                ),
+            )
+        }
+    }
+
+    fun selectPwVaultRevisionSubject(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    selectedRevisionSubjectId = subjectId,
+                ),
+            )
+        }
+    }
+
+    fun openVaultCommandPalette(focus: VaultPaletteFocus) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    isCommandPaletteOpen = true,
+                    paletteInitialFocus = focus,
+                ),
+            )
+        }
+    }
+
+    fun closeVaultCommandPalette() {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(isCommandPaletteOpen = false),
+            )
+        }
+    }
+
+    fun updateVaultPaletteQuery(query: String) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(paletteSearchQuery = query),
+            )
+        }
+    }
+
+    fun selectVaultPaletteSubjectFilter(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(paletteFilterSubjectId = subjectId),
+            )
+        }
+    }
+
+    fun selectVaultPaletteCategoryFilter(category: VaultCategorySubView?) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(paletteFilterCategory = category),
+            )
+        }
+    }
+
+    fun clearVaultPaletteFilters() {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    paletteSearchQuery = "",
+                    paletteFilterSubjectId = null,
+                    paletteFilterCategory = null,
+                ),
+            )
+        }
+    }
+
+    fun jumpToVaultLectureFromPalette(
+        lecture: VaultLectureNode,
+        targetSubView: VaultCategorySubView,
+    ) {
+        _uiState.update { state ->
+            state.copy(
+                pwVaultState = state.pwVaultState.copy(
+                    isCommandPaletteOpen = false,
+                    selectedBatchId = lecture.batchId,
+                    selectedSubjectId = lecture.subjectId,
+                    selectedChapterId = lecture.chapterId,
+                    selectedLectureId = lecture.id,
+                    activeSubView = targetSubView,
+                    expandedClassNoteLectureId = if (targetSubView == VaultCategorySubView.CLASS_NOTES) lecture.id else state.pwVaultState.expandedClassNoteLectureId,
+                    expandedFlashcardChapterId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.chapterId else state.pwVaultState.expandedFlashcardChapterId,
+                    previewFlashcardId = if (targetSubView == VaultCategorySubView.FLASHCARDS) lecture.flashcardDeck.firstOrNull()?.id else state.pwVaultState.previewFlashcardId,
+                    isPreviewCardFlipped = false,
+                    selectedRevisionSubjectId = if (targetSubView == VaultCategorySubView.REVISION) lecture.subjectId else state.pwVaultState.selectedRevisionSubjectId,
+                ),
+            )
+        }
+    }
+
     // --- Layered Back Navigation ---
 
     fun navigateBackToHome() {
         _uiState.update { state ->
             when {
+                state.homeCommandState.activeDailyPage != null ->
+                    state.copy(homeCommandState = state.homeCommandState.copy(activeDailyPage = null, isActiveFlashcardFlipped = false))
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
                 state.activeTab == WorkspaceTab.BATCHES && state.batchesState.isBuilderOpen ->
                     state.copy(batchesState = state.batchesState.copy(isBuilderOpen = false))
-                state.activeTab == WorkspaceTab.VAULT && state.vaultState.showReaderInfoDrawer ->
-                    state.copy(vaultState = state.vaultState.copy(showReaderInfoDrawer = false))
-                state.activeTab == WorkspaceTab.VAULT && state.vaultState.isReaderOpen ->
-                    state.copy(vaultState = state.vaultState.copy(openedReaderMaterialId = null))
-                state.activeTab == WorkspaceTab.VAULT && state.vaultState.previewedMaterialId != null ->
-                    state.copy(vaultState = state.vaultState.copy(previewedMaterialId = null))
-                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.activePermissionRequest != null ->
-                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(activePermissionRequest = null))
-                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.isScheduleSettingsOpen ->
-                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(isScheduleSettingsOpen = false))
-                state.activeTab == WorkspaceTab.TUTOR_PLANNER && state.tutorPlannerState.isCoPlanSplitEnabled ->
-                    state.copy(tutorPlannerState = state.tutorPlannerState.copy(isCoPlanSplitEnabled = false))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.isCommandPaletteOpen ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(isCommandPaletteOpen = false))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.activeSubView != VaultCategorySubView.HIERARCHY_BROWSE ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(activeSubView = VaultCategorySubView.HIERARCHY_BROWSE))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedLectureId != null ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(selectedLectureId = null))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedChapterId != null ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(selectedChapterId = null))
+                state.activeTab == WorkspaceTab.VAULT && state.pwVaultState.selectedSubjectId != null ->
+                    state.copy(pwVaultState = state.pwVaultState.copy(selectedSubjectId = null))
                 state.activeTab != WorkspaceTab.HOME -> state.copy(activeTab = WorkspaceTab.HOME)
                 else -> state
             }
@@ -1480,17 +1924,28 @@ class WorkspaceViewModel : ViewModel() {
         val initialRevisionSheets = Phase13MockData.createRevisionSheets()
         val initialQuizQuestions = Phase13MockData.createQuizQuestions()
         val defaultQuizSubject = Phase13MockData.SUBJECT_PHYSICS_ID
+        val initialPwSubjectsByBatch = Phase161MockData.createPwVaultSubjectsByBatch()
+        val firstPwSubject = initialPwSubjectsByBatch[firstBatch.id]?.firstOrNull()
+        val firstPwChapter = firstPwSubject?.chapters?.firstOrNull()
 
         return WorkspaceUiState(
             activeTab = WorkspaceTab.HOME,
             accentMood = AccentMood.CYAN,
             focusMode = FocusMode.AI_READY,
             streakDays = 14,
+            primaryBatchId = firstBatch.id,
             revisionBrief = brief,
             subjects = subjects,
             yesterdayTopics = yesterdayTopics,
             spacedReviews = spacedReviews,
             inspectSelection = null,
+            homeCommandState = HomeCommandState(
+                todayRevisionCompleted = false,
+                todayFlashcardsCompleted = false,
+                activeDailyPage = null,
+                todayRevisionTakeaways = Phase161MockData.createYesterdayRevisionTakeaways(),
+                todayFlashcards = Phase161MockData.createYesterdayFlashcards(),
+            ),
             batchesState = BatchesUiState(
                 batches = initialBatches,
                 selectedBatchId = firstBatch.id,
@@ -1500,6 +1955,13 @@ class WorkspaceViewModel : ViewModel() {
             vaultState = VaultUiState(
                 materials = Phase12MockData.createInitialVaultMaterials(),
                 previewedMaterialId = "mat_phys_gauss_pdf",
+            ),
+            pwVaultState = PwVaultUiState(
+                subjectsByBatch = initialPwSubjectsByBatch,
+                selectedBatchId = firstBatch.id,
+                expandedFlashcardChapterId = firstPwChapter?.id,
+                previewFlashcardId = firstPwChapter?.lectures?.firstOrNull()?.flashcardDeck?.firstOrNull()?.id,
+                selectedRevisionSubjectId = firstPwSubject?.id,
             ),
             revisionQuizState = RevisionQuizUiState(
                 activeMode = RevisionQuizTabMode.REVISION_NOTES,

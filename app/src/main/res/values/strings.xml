@@ -187,4 +187,46 @@
     <string name="planner_gate_revise">Revise Request</string>
     <string name="planner_snackbar_applied">AI-approved schedule update applied to today\'s timeline.</string>
     <string name="planner_snackbar_counter">AI counter-proposal applied cleanly within your Wake-to-Sleep rules.</string>
+
+    <!-- Phase 1.6.1: Cleaned Nav Rail, Home Study Gate & PW-Style Vault -->
+    <string name="nav_ai_tutor">AI Tutor</string>
+    <string name="nav_daily_planner">Daily Planner</string>
+    <string name="nav_timer_group">Timer &amp; Group</string>
+
+    <string name="home_primary_batch_tag">PRIMARY BATCH</string>
+    <string name="home_switch_batch">Switch Batch</string>
+    <string name="home_syllabus_coverage">Syllabus Coverage</string>
+    <string name="home_today_revision_title">Today\'s Revision</string>
+    <string name="home_today_flashcards_title">Today\'s Flashcards</string>
+    <string name="home_from_yesterday_ai">AI-generated from yesterday\'s study log</string>
+    <string name="home_auto_saved_vault">Auto-Saved to Vault</string>
+    <string name="home_gate_locked_title">Study Gate Locked</string>
+    <string name="home_gate_unlocked_title">Study Gate Unlocked</string>
+    <string name="home_gate_start_new_study">Start Today\'s New Study</string>
+    <string name="home_gate_test_switch">Quick Gate Test</string>
+    <string name="home_stat_improvement">% Improvement</string>
+    <string name="home_stat_syllabus_gain">% Syllabus Coverage Gain</string>
+    <string name="home_daily_back_home">Back to Home</string>
+    <string name="home_daily_revision_complete_cta">Mark Today\'s Revision Complete</string>
+    <string name="home_daily_revision_done_cta">Today\'s Revision Completed</string>
+    <string name="home_daily_flashcards_complete_cta">Complete Today\'s Flashcards</string>
+    <string name="home_daily_flashcards_done_cta">Today\'s Flashcards Completed</string>
+
+    <string name="batches_primary_badge">PRIMARY</string>
+    <string name="batches_set_primary_cta">Set as Primary</string>
+
+    <string name="vault_pw_title">Study Vault</string>
+    <string name="vault_pw_subtitle">Batch → Subject → Chapter → Lecture coaching archive</string>
+    <string name="vault_icon_search_desc">Open Vault Search Command Palette</string>
+    <string name="vault_icon_filter_desc">Open Vault Filter Command Palette</string>
+    <string name="vault_palette_title">Vault Command Palette</string>
+    <string name="vault_palette_search_placeholder">Jump to any lecture, notes PDF, flashcard deck, or revision sheet…</string>
+    <string name="vault_subview_hierarchy">Browse</string>
+    <string name="vault_subview_class_notes">Class Notes</string>
+    <string name="vault_subview_flashcards">Flashcards</string>
+    <string name="vault_subview_revision">Revision</string>
+    <string name="vault_rag_tutor_tag">Attachable RAG · AI Tutor</string>
+    <string name="vault_rag_notebooklm_tag">RAG · NotebookLM [Upcoming]</string>
+    <string name="vault_flashcards_grouping_hint">Sorted by Chapter → Class</string>
+    <string name="vault_revision_grouping_hint">Organized by Subject → Chapter → Lecture</string>
 </resources>

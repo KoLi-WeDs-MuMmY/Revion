@@ -52,6 +52,7 @@ import com.example.ui.theme.MonoBadgeStyle
 fun BatchRosterPane(
     batches: List<StudyBatch>,
     selectedBatchId: String,
+    primaryBatchId: String,
     onSelectBatch: (String) -> Unit,
     onCreateBatchClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -145,6 +146,7 @@ fun BatchRosterPane(
                     BatchRosterTile(
                         batch = batch,
                         selected = batch.id == selectedBatchId,
+                        isPrimary = batch.id == primaryBatchId,
                         onClick = { onSelectBatch(batch.id) },
                     )
                 }
@@ -157,6 +159,7 @@ fun BatchRosterPane(
 private fun BatchRosterTile(
     batch: StudyBatch,
     selected: Boolean,
+    isPrimary: Boolean,
     onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
@@ -221,12 +224,31 @@ private fun BatchRosterTile(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        text = batch.goalTag.uppercase(),
-                        style = MonoBadgeStyle,
-                        color = accent,
-                        maxLines = 1,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = batch.goalTag.uppercase(),
+                            style = MonoBadgeStyle,
+                            color = accent,
+                            maxLines = 1,
+                        )
+                        if (isPrimary) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = tokens.obsidianSurface,
+                                border = BorderStroke(1.dp, accent.copy(alpha = 0.36f)),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.batches_primary_badge),
+                                    style = MonoBadgeStyle,
+                                    color = accent,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = "${batch.overallProgressPercent}%",
                         style = MonoBadgeStyle,

@@ -44,12 +44,32 @@ import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MonoMetricMedium
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarOutline
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import com.example.ui.components.tactileScale
+import com.example.ui.theme.MonoBadgeStyle
+
 @Composable
 fun BatchesScreen(
     batchesState: BatchesUiState,
+    primaryBatchId: String,
     activeThemeMood: AccentMood,
     isWideLayout: Boolean,
     onSelectBatch: (String) -> Unit,
+    onSetPrimaryBatch: (String) -> Unit,
     onToggleExpandSubject: (String) -> Unit,
     onToggleChapterCompleted: (batchId: String, subjectId: String, chapterId: String) -> Unit,
     onOpenBuilder: () -> Unit,
@@ -115,6 +135,7 @@ fun BatchesScreen(
                     BatchRosterPane(
                         batches = batchesState.batches,
                         selectedBatchId = batchesState.selectedBatchId,
+                        primaryBatchId = primaryBatchId,
                         onSelectBatch = onSelectBatch,
                         onCreateBatchClick = onOpenBuilder,
                     )
@@ -129,8 +150,10 @@ fun BatchesScreen(
                     if (selectedBatch != null) {
                         BatchDetailCanvas(
                             batch = selectedBatch,
+                            isPrimary = selectedBatch.id == primaryBatchId,
                             expandedSubjectId = batchesState.expandedSubjectId,
                             focusAccent = animatedFocusAccent,
+                            onSetPrimaryBatch = { onSetPrimaryBatch(selectedBatch.id) },
                             onToggleExpandSubject = onToggleExpandSubject,
                             onToggleChapterCompleted = { subjectId, chapterId ->
                                 onToggleChapterCompleted(selectedBatch.id, subjectId, chapterId)
@@ -164,6 +187,7 @@ fun BatchesScreen(
                     BatchRosterPane(
                         batches = batchesState.batches,
                         selectedBatchId = batchesState.selectedBatchId,
+                        primaryBatchId = primaryBatchId,
                         onSelectBatch = onSelectBatch,
                         onCreateBatchClick = onOpenBuilder,
                     )
@@ -173,7 +197,9 @@ fun BatchesScreen(
                     item(key = "batches_mobile_banner_${selectedBatch.id}") {
                         BatchOverviewBanner(
                             batch = selectedBatch,
+                            isPrimary = selectedBatch.id == primaryBatchId,
                             focusAccent = animatedFocusAccent,
+                            onSetPrimaryBatch = { onSetPrimaryBatch(selectedBatch.id) },
                         )
                     }
 
@@ -211,8 +237,10 @@ fun BatchesScreen(
 @Composable
 private fun BatchDetailCanvas(
     batch: StudyBatch,
+    isPrimary: Boolean,
     expandedSubjectId: String?,
     focusAccent: Color,
+    onSetPrimaryBatch: () -> Unit,
     onToggleExpandSubject: (String) -> Unit,
     onToggleChapterCompleted: (subjectId: String, chapterId: String) -> Unit,
 ) {
@@ -236,7 +264,9 @@ private fun BatchDetailCanvas(
             item(key = "overview_${activeBatch.id}") {
                 BatchOverviewBanner(
                     batch = activeBatch,
+                    isPrimary = isPrimary,
                     focusAccent = focusAccent,
+                    onSetPrimaryBatch = onSetPrimaryBatch,
                 )
             }
 
@@ -263,9 +293,12 @@ private fun BatchDetailCanvas(
 @Composable
 private fun BatchOverviewBanner(
     batch: StudyBatch,
+    isPrimary: Boolean,
     focusAccent: Color,
+    onSetPrimaryBatch: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
+    val primaryInteraction = remember { MutableInteractionSource() }
 
     ObsidianCard(
         modifier = Modifier
@@ -297,6 +330,48 @@ private fun BatchOverviewBanner(
                         textColor = focusAccent,
                         borderColor = focusAccent.copy(alpha = 0.34f),
                     )
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = if (isPrimary) focusAccent.copy(alpha = 0.16f) else tokens.carbonSurface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isPrimary) focusAccent.copy(alpha = 0.42f) else tokens.hairlineRest,
+                        ),
+                        modifier = Modifier
+                            .testTag("batch_set_primary_button_${batch.id}")
+                            .minimumInteractiveComponentSize()
+                            .tactileScale(primaryInteraction, pressedScale = 0.95f)
+                            .clip(RoundedCornerShape(100.dp))
+                            .clickable(
+                                enabled = !isPrimary,
+                                interactionSource = primaryInteraction,
+                                indication = ripple(color = focusAccent.copy(alpha = 0.18f)),
+                                role = Role.Button,
+                                onClick = onSetPrimaryBatch,
+                            ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isPrimary) Icons.Rounded.Star else Icons.Rounded.StarOutline,
+                                contentDescription = null,
+                                tint = if (isPrimary) focusAccent else tokens.inkSecondary,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Text(
+                                text = if (isPrimary) {
+                                    stringResource(R.string.batches_primary_badge)
+                                } else {
+                                    stringResource(R.string.batches_set_primary_cta)
+                                },
+                                style = MonoBadgeStyle,
+                                color = if (isPrimary) focusAccent else tokens.inkPrimary,
+                            )
+                        }
+                    }
                     Text(
                         text = batch.targetDateLabel,
                         style = MaterialTheme.typography.labelSmall,

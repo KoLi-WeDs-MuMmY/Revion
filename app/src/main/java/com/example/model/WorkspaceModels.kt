@@ -2,17 +2,17 @@ package com.example.model
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FolderCopy
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Quiz
-import androidx.compose.material.icons.filled.Style
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.FolderCopy
 import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.Quiz
-import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.ui.theme.AccentMood
@@ -63,63 +63,63 @@ enum class WorkspaceTab(
         shortLabel = "Vault",
         selectedIcon = Icons.Filled.FolderCopy,
         unselectedIcon = Icons.Outlined.FolderCopy,
-        phaseTag = "PHASE 1.2",
-        previewTitle = "Study Material Vault",
-        previewSummary = "Centralized library for chapter PDFs, annotated formula sheets, lecture logs, and quick visual previews.",
+        phaseTag = "PHASE 1.6.1",
+        previewTitle = "PW-Style Study Material Vault",
+        previewSummary = "Batch -> Subject -> Chapter -> Lecture archive organizing Class Notes/RAG, Flashcards, and Revision digests.",
         plannedCapabilities = listOf(
-            "Structured chapter folders with material type filters and metadata tags",
-            "Split-pane document preview deck optimized for 16:9 landscape reading",
-            "Instant log-to-revision bookmarking for studied chapters",
+            "Collapsible breadcrumb navigation across Batches, Subjects, Chapters & Lectures",
+            "Icon-triggered Command Palette for distraction-free search & filtering",
+            "Morphing sub-views for Class Notes/RAG, Flashcards (Chapter -> Class), and Revision",
         ),
         suggestedMood = AccentMood.CYAN,
     ),
-    REVISION_QUIZ(
-        routeId = "revision_quiz",
-        label = "Revision & Quiz",
-        shortLabel = "Revision",
-        selectedIcon = Icons.Filled.Quiz,
-        unselectedIcon = Icons.Outlined.Quiz,
-        phaseTag = "PHASE 1.3",
-        previewTitle = "Daily Revision Notes & Interactive Quiz",
-        previewSummary = "Synthesized daily revision digests, clean concept diagrams, and timed adaptive subject checks.",
-        plannedCapabilities = listOf(
-            "Structured daily revision sheets distilled from yesterday's logged topics",
-            "Interactive concept diagrams and formula recall reveal cards",
-            "Multi-mode subject quiz runner with confidence tagging and instant explanations",
-        ),
-        suggestedMood = AccentMood.EMERALD,
-    ),
-    FLASHCARDS(
-        routeId = "flashcards",
-        label = "Flashcards",
-        shortLabel = "Cards",
-        selectedIcon = Icons.Filled.Style,
-        unselectedIcon = Icons.Outlined.Style,
-        phaseTag = "PHASE 1.4",
-        previewTitle = "Spaced Flashcards & Mistake Bank",
-        previewSummary = "Precision x-1, x-3, and weekend hard-topic spaced repetition decks paired with a dedicated Mistake Bank.",
-        plannedCapabilities = listOf(
-            "3D tactile flip cards scheduled on x-1, x-3, and weekend consolidation cadence",
-            "Confidence grading (Again, Hard, Solid) with kinetic progress bar",
-            "Mistake Bank triage isolating recurring error patterns by chapter",
-        ),
-        suggestedMood = AccentMood.AMBER,
-    ),
-    TUTOR_PLANNER(
-        routeId = "tutor_planner",
-        label = "Tutor & Planner",
+    AI_TUTOR(
+        routeId = "ai_tutor",
+        label = "AI Tutor",
         shortLabel = "Tutor",
         selectedIcon = Icons.Filled.AutoAwesome,
         unselectedIcon = Icons.Outlined.AutoAwesome,
-        phaseTag = "PHASE 1.5",
-        previewTitle = "Chapter RAG AI Tutor & Daily Planner",
-        previewSummary = "Chapter-grounded Socratic AI tutoring alongside a wake-to-sleep time-blocked study planner.",
+        phaseTag = "PHASE 1.6.2",
+        previewTitle = "Grok-Style Chapter AI Tutor & Tests",
+        previewSummary = "Collapsible chat history grouped by batch & chapter, code-based Image-Code Web Viewer, and Exam vs. Normal test modes.",
         plannedCapabilities = listOf(
-            "Side-by-side chapter context pane and grounded AI tutor conversation UI",
-            "Wake-to-sleep daily block timeline with focus sprints and recovery breaks",
-            "Weak-topic intervention slots automatically surfaced in the daily schedule",
+            "Grok-style collapsible chat history grouped cleanly by Batch & Chapter",
+            "Image-Code Web Viewer rendering visual revision diagrams matched in chapter RAG",
+            "Dual-mode Normal vs. Exam tests with step-by-step concept explanations",
         ),
         suggestedMood = AccentMood.VIOLET,
+    ),
+    DAILY_PLANNER(
+        routeId = "daily_planner",
+        label = "Daily Planner",
+        shortLabel = "Planner",
+        selectedIcon = Icons.Filled.CalendarMonth,
+        unselectedIcon = Icons.Outlined.CalendarMonth,
+        phaseTag = "PHASE 1.6.3",
+        previewTitle = "Standalone AI Daily Planner",
+        previewSummary = "AI-governed daily schedule with single daily-updated RAG summary (every 3 days), zero-context carryover per open, and AI task approval.",
+        plannedCapabilities = listOf(
+            "Dedicated AI toggle with zero-context carryover per planner session",
+            "Single daily-updated RAG progress file summarized cleanly every 3 days",
+            "AI rule approval to confirm your day or authorize task edits and cancellations",
+        ),
+        suggestedMood = AccentMood.EMERALD,
+    ),
+    TIMER_GROUP(
+        routeId = "timer_group",
+        label = "Timer & Group",
+        shortLabel = "Timer",
+        selectedIcon = Icons.Filled.Timer,
+        unselectedIcon = Icons.Outlined.Timer,
+        phaseTag = "PHASE 1.6.3",
+        previewTitle = "Customizable Study Timer & YPT Group Study",
+        previewSummary = "Focused customizable study timers paired with YPT-style accountability rooms and subject time tracking.",
+        plannedCapabilities = listOf(
+            "Customizable Pomodoro, deep-sprint, and exam countdown timers",
+            "YPT-style live accountability study groups with daily study leaderboards",
+            "Automatic subject session logging linked to your Primary Batch syllabus",
+        ),
+        suggestedMood = AccentMood.AMBER,
     ),
 }
 
@@ -192,14 +192,22 @@ data class WorkspaceUiState(
     val accentMood: AccentMood = AccentMood.CYAN,
     val focusMode: FocusMode = FocusMode.AI_READY,
     val streakDays: Int = 14,
+    // Single Source of Truth for Primary Batch synced across Home, Batches & Vault
+    val primaryBatchId: String = "batch_jee_2026",
     val revisionBrief: DailyRevisionBrief,
     val subjects: List<SubjectMastery>,
     val yesterdayTopics: List<LoggedTopic>,
     val spacedReviews: List<SpacedReviewItem>,
     val inspectSelection: InspectSelection? = null,
+    val homeCommandState: HomeCommandState,
     val batchesState: BatchesUiState,
     val vaultState: VaultUiState,
+    val pwVaultState: PwVaultUiState,
     val revisionQuizState: RevisionQuizUiState,
     val flashcardsState: FlashcardsMistakesUiState,
     val tutorPlannerState: TutorPlannerUiState,
-)
+) {
+    val primaryBatch: StudyBatch
+        get() = batchesState.batches.firstOrNull { it.id == primaryBatchId }
+            ?: batchesState.batches.first()
+}

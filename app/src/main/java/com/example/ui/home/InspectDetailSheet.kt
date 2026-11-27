@@ -72,7 +72,7 @@ fun InspectDetailSheet(
                     "Target" to "${selection.brief.targetRetentionPercent}%",
                 ),
                 bullets = selection.brief.focusPoints,
-                targetTab = WorkspaceTab.REVISION_QUIZ,
+                targetTab = WorkspaceTab.VAULT,
             )
 
             is InspectSelection.Subject -> InspectPresentation(
@@ -114,7 +114,7 @@ fun InspectDetailSheet(
                     "Retention" to "${selection.review.retentionPercent}%",
                 ),
                 bullets = selection.review.reviewNotes,
-                targetTab = WorkspaceTab.FLASHCARDS,
+                targetTab = WorkspaceTab.VAULT,
             )
         }
     }
