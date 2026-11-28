@@ -21,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -63,6 +65,31 @@ fun Modifier.tactileScale(
         scaleX = scale
         scaleY = scale
     }
+}
+
+@Composable
+fun Modifier.tactileScale(
+    pressedScale: Float = 0.975f,
+): Modifier {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) pressedScale else 1f,
+        animationSpec = GhickinMotion.PressSpring,
+        label = "tactileScaleSimple",
+    )
+    return this
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    isPressed = event.changes.any { it.pressed }
+                }
+            }
+        }
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
 }
 
 @Composable

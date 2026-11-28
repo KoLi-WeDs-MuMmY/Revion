@@ -240,6 +240,8 @@ data class WorkspaceUiState(
     val standalonePlannerState: StandalonePlannerUiState,
     val studyTimerGroupState: StudyTimerGroupUiState,
     val settingsRagHubState: SettingsRagHubState = SettingsRagHubState(),
+    val settingsPrefs: AppSettingsPreferences = AppSettingsPreferences(),
+    val homeClockTagPicker: HomeClockTagPickerState = HomeClockTagPickerState(),
 ) {
     val primaryBatch: StudyBatch
         get() = batchesState.batches.firstOrNull { it.id == primaryBatchId }

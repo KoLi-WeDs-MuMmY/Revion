@@ -74,11 +74,12 @@ import com.example.R
 import com.example.model.DailyPageRoute
 import com.example.model.HomeCommandState
 import com.example.model.HomeLiveAnalytics
+import com.example.model.LayoutDensityMode
+import com.example.model.LiveClockTick
 import com.example.model.StudyBatch
 import com.example.model.TimerSessionSource
 import com.example.model.WorkspaceUiState
 import com.example.model.formatDurationCompactHm
-import com.example.model.formatDurationHms
 import com.example.ui.components.AnimatedLinearProgressBar
 import com.example.ui.components.AnimatedMasteryRing
 import com.example.ui.components.KineticNumberText
@@ -90,10 +91,12 @@ import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 import com.example.ui.theme.rememberScreenLayoutMetrics
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun HomeCommandCenter(
     uiState: WorkspaceUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
     isWideLayout: Boolean,
     onOpenSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
@@ -113,18 +116,23 @@ fun HomeCommandCenter(
     onQuickOpenAiTutor: () -> Unit = {},
     onQuickOpenQuizzes: () -> Unit = {},
     onQuickOpenStudyTimer: () -> Unit = {},
+    onQuickOpenPlanner: () -> Unit = {},
+    onOpenHomeClockTagPicker: (launchFullScreenOnConfirm: Boolean) -> Unit = {},
+    onDismissHomeClockTagPicker: () -> Unit = {},
+    onSelectHomeClockBatch: (String) -> Unit = {},
+    onSelectHomeClockSubject: (String?) -> Unit = {},
+    onSelectHomeClockChapter: (String?) -> Unit = {},
+    onSelectHomeClockLecture: (String?) -> Unit = {},
+    onConfirmHomeClockTagSelection: () -> Unit = {},
+    onStartHomeClockUntagged: () -> Unit = {},
+    onTogglePlannerUserTask: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val homeState = uiState.homeCommandState
     val timerState = uiState.studyTimerGroupState
 
-    val autoRevisionBadge = if (timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_REVISION) {
-        "AUTO · Revision · ${formatDurationHms(timerState.elapsedSeconds)}"
-    } else null
-
-    val autoFlashcardsBadge = if (timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_FLASHCARDS) {
-        "AUTO · Flashcards · ${formatDurationHms(timerState.elapsedSeconds)}"
-    } else null
+    val isAutoRevisionActive = timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_REVISION
+    val isAutoFlashcardsActive = timerState.isAutoTimerActive && timerState.timerSource == TimerSessionSource.AUTO_FLASHCARDS
 
     AnimatedContent(
         targetState = homeState.activeDailyPage,
@@ -140,7 +148,8 @@ fun HomeCommandCenter(
                 state = homeState,
                 appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
-                autoTimerBadgeText = autoRevisionBadge,
+                clockTickFlow = clockTickFlow,
+                isAutoTimerActive = isAutoRevisionActive,
                 onBackToHome = onCloseDailyPage,
                 onMarkComplete = onCompleteTodayRevision,
             )
@@ -149,7 +158,8 @@ fun HomeCommandCenter(
                 state = homeState,
                 appTheme = uiState.appTheme,
                 isWideLayout = isWideLayout,
-                autoTimerBadgeText = autoFlashcardsBadge,
+                clockTickFlow = clockTickFlow,
+                isAutoTimerActive = isAutoFlashcardsActive,
                 onBackToHome = onCloseDailyPage,
                 onFlipCard = onFlipDailyFlashcard,
                 onStepCard = onStepDailyFlashcard,
@@ -158,6 +168,7 @@ fun HomeCommandCenter(
 
             null -> HomeCommandCanvas(
                 uiState = uiState,
+                clockTickFlow = clockTickFlow,
                 isWideLayout = isWideLayout,
                 onOpenSettings = onOpenSettings,
                 onToggleFocusMode = onToggleFocusMode,
@@ -170,6 +181,16 @@ fun HomeCommandCenter(
                 onQuickOpenAiTutor = onQuickOpenAiTutor,
                 onQuickOpenQuizzes = onQuickOpenQuizzes,
                 onQuickOpenStudyTimer = onQuickOpenStudyTimer,
+                onQuickOpenPlanner = onQuickOpenPlanner,
+                onOpenHomeClockTagPicker = onOpenHomeClockTagPicker,
+                onDismissHomeClockTagPicker = onDismissHomeClockTagPicker,
+                onSelectHomeClockBatch = onSelectHomeClockBatch,
+                onSelectHomeClockSubject = onSelectHomeClockSubject,
+                onSelectHomeClockChapter = onSelectHomeClockChapter,
+                onSelectHomeClockLecture = onSelectHomeClockLecture,
+                onConfirmHomeClockTagSelection = onConfirmHomeClockTagSelection,
+                onStartHomeClockUntagged = onStartHomeClockUntagged,
+                onTogglePlannerUserTask = onTogglePlannerUserTask,
             )
         }
     }
@@ -178,6 +199,7 @@ fun HomeCommandCenter(
 @Composable
 private fun HomeCommandCanvas(
     uiState: WorkspaceUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
     isWideLayout: Boolean,
     onOpenSettings: () -> Unit,
     onToggleFocusMode: () -> Unit,
@@ -190,6 +212,16 @@ private fun HomeCommandCanvas(
     onQuickOpenAiTutor: () -> Unit,
     onQuickOpenQuizzes: () -> Unit,
     onQuickOpenStudyTimer: () -> Unit,
+    onQuickOpenPlanner: () -> Unit,
+    onOpenHomeClockTagPicker: (launchFullScreenOnConfirm: Boolean) -> Unit,
+    onDismissHomeClockTagPicker: () -> Unit,
+    onSelectHomeClockBatch: (String) -> Unit,
+    onSelectHomeClockSubject: (String?) -> Unit,
+    onSelectHomeClockChapter: (String?) -> Unit,
+    onSelectHomeClockLecture: (String?) -> Unit,
+    onConfirmHomeClockTagSelection: () -> Unit,
+    onStartHomeClockUntagged: () -> Unit,
+    onTogglePlannerUserTask: (String) -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val primaryBatch = uiState.primaryBatch
@@ -209,6 +241,12 @@ private fun HomeCommandCanvas(
         analytics.batchFlashcardCount,
     )
 
+    val effectiveSectionSpacing = if (uiState.settingsPrefs.layoutDensity == LayoutDensityMode.COMPACT_FOCUS) {
+        (metrics.sectionSpacing - 4.dp).coerceAtLeast(10.dp)
+    } else {
+        metrics.sectionSpacing
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -223,7 +261,7 @@ private fun HomeCommandCanvas(
                 horizontal = metrics.horizontalPadding,
                 vertical = metrics.verticalPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(metrics.sectionSpacing),
+            verticalArrangement = Arrangement.spacedBy(effectiveSectionSpacing),
         ) {
             item(key = "home_header") {
                 StaggeredEntrance(delayMillis = 0L) {
@@ -321,18 +359,68 @@ private fun HomeCommandCanvas(
                 }
             }
 
+            // Section 1.2: Modern Rectangular 3D Flip-Clock Card + Today's Plan & Tasks Card
+            item(key = "home_flip_clock_and_plan") {
+                val onPlayClick = {
+                    if (uiState.studyTimerGroupState.isTimerActiveSession) {
+                        onQuickOpenStudyTimer()
+                    } else {
+                        onOpenHomeClockTagPicker(true)
+                    }
+                }
+                if (isWideLayout) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        HomeRectangularFlipClockCard(
+                            timerState = uiState.studyTimerGroupState,
+                            clockTickFlow = clockTickFlow,
+                            clockTheme = uiState.settingsPrefs.clockTheme,
+                            motionIntensity = uiState.settingsPrefs.motionIntensity,
+                            onClickTagSelector = { onOpenHomeClockTagPicker(false) },
+                            onClickPlayClock = onPlayClick,
+                            modifier = Modifier.weight(0.48f),
+                        )
+                        HomeTodaysPlanTasksCard(
+                            plannerState = uiState.standalonePlannerState,
+                            onToggleUserTask = onTogglePlannerUserTask,
+                            onOpenPlanner = onQuickOpenPlanner,
+                            modifier = Modifier.weight(0.52f),
+                        )
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        HomeRectangularFlipClockCard(
+                            timerState = uiState.studyTimerGroupState,
+                            clockTickFlow = clockTickFlow,
+                            clockTheme = uiState.settingsPrefs.clockTheme,
+                            motionIntensity = uiState.settingsPrefs.motionIntensity,
+                            onClickTagSelector = { onOpenHomeClockTagPicker(false) },
+                            onClickPlayClock = onPlayClick,
+                        )
+                        HomeTodaysPlanTasksCard(
+                            plannerState = uiState.standalonePlannerState,
+                            onToggleUserTask = onTogglePlannerUserTask,
+                            onOpenPlanner = onQuickOpenPlanner,
+                        )
+                    }
+                }
+            }
+
             // Section 1.5: Studio Quick-Launch Strip (Study Timer, AI Tutor & Quiz Arena)
             item(key = "home_studio_quick_launch") {
                 val timerState = uiState.studyTimerGroupState
                 val timerBadge = if (timerState.isTimerActiveSession) {
-                    "LIVE ${formatDurationHms(timerState.displaySeconds)}"
+                    "SESSION LIVE"
                 } else {
                     "${formatDurationCompactHm(timerState.todayTotalStudySeconds)} TODAY"
                 }
                 val timerSubtitle = if (timerState.isTimerActiveSession) {
                     "Synced with YPT Group · ${timerState.activeSubjectName ?: "Tagless"}"
                 } else {
-                    "Pomodoro, Flip Stopwatch & YPT Group Study"
+                    "3D Flip Clock & YPT Group Study"
                 }
 
                 StaggeredEntrance(delayMillis = 75L) {
@@ -506,6 +594,22 @@ private fun HomeCommandCanvas(
                     )
                 }
             }
+        }
+
+        // Cascading Batch -> Subject -> Chapter -> Lecture Picker Modal for Home Flip Clock
+        if (uiState.homeClockTagPicker.isOpen) {
+            HomeCascadingClockTagModal(
+                pickerState = uiState.homeClockTagPicker,
+                batches = uiState.batchesState.batches,
+                subjectsByBatch = uiState.pwVaultState.subjectsByBatch,
+                onSelectBatch = onSelectHomeClockBatch,
+                onSelectSubject = onSelectHomeClockSubject,
+                onSelectChapter = onSelectHomeClockChapter,
+                onSelectLecture = onSelectHomeClockLecture,
+                onConfirmSelection = onConfirmHomeClockTagSelection,
+                onStartUntagged = onStartHomeClockUntagged,
+                onDismiss = onDismissHomeClockTagPicker,
+            )
         }
     }
 }

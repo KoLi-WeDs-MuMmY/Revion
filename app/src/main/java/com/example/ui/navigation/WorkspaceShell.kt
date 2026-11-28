@@ -59,15 +59,22 @@ import androidx.compose.ui.unit.dp
 import com.example.model.AppRagFileId
 import com.example.model.BatchCrudDialog
 import com.example.model.ChapterDiagramRef
+import com.example.model.ClockThemeId
 import com.example.model.DailyPageRoute
 import com.example.model.DiagramAttachment
+import com.example.model.LayoutDensityMode
+import com.example.model.LiveClockTick
+import com.example.model.MotionIntensity
 import com.example.model.PlannerAiDecisionOutcome
+import com.example.model.PlannerAppealOutcome
 import com.example.model.PomodoroRingStyle
 import com.example.model.PresetSubjectTemplate
 import com.example.model.SettingsSectionTab
+import com.example.model.SplitPosture
 import com.example.model.StandalonePlannerTask
 import com.example.model.StudyTimerGroupUiState
 import com.example.model.StudyTimerMode
+import com.example.model.SubjectIndicatorStyle
 import com.example.model.TestArenaMode
 import com.example.model.TimerSplitRatio
 import com.example.model.VaultCategorySubView
@@ -88,9 +95,11 @@ import com.example.ui.theme.AccentMood
 import com.example.ui.theme.AppThemeId
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MicroTagMono
+import com.example.ui.timer.LiveClockTickTextLeaf
 import com.example.ui.timer.StudyTimerAndGroupScreen
 import com.example.ui.tutor.GrokAiTutorScreen
 import com.example.ui.vault.PwVaultScreen
+import kotlinx.coroutines.flow.StateFlow
 
 @Immutable
 data class Phase163Actions(
@@ -152,9 +161,60 @@ data class Phase163Actions(
     val onRunSettingsRagAiOptimization: (AppRagFileId) -> Unit,
 )
 
+@Immutable
+data class Phase164Actions(
+    // Structured Settings
+    val onSelectClockTheme: (ClockThemeId) -> Unit,
+    val onSelectMotionIntensity: (MotionIntensity) -> Unit,
+    val onSelectLayoutDensity: (LayoutDensityMode) -> Unit,
+    val onAdjustDefaultFocusMinutes: (Int) -> Unit,
+    val onAdjustDefaultBreakMinutes: (Int) -> Unit,
+    val onToggleAutoLogStudySessions: (Boolean) -> Unit,
+    val onSelectSubjectIndicatorStyle: (SubjectIndicatorStyle) -> Unit,
+    val onAdjustManualTaskEditCap: (Int) -> Unit,
+    val onRequestResetDemoState: () -> Unit,
+    val onConfirmResetDemoState: () -> Unit,
+    val onDismissResetDemoDialog: () -> Unit,
+    // Home Rectangular Flip Clock & Cascading Tag Picker
+    val onOpenHomeClockTagPicker: (launchFullScreenOnConfirm: Boolean) -> Unit,
+    val onDismissHomeClockTagPicker: () -> Unit,
+    val onSelectHomeClockBatch: (String) -> Unit,
+    val onSelectHomeClockSubject: (String?) -> Unit,
+    val onSelectHomeClockChapter: (String?) -> Unit,
+    val onSelectHomeClockLecture: (String?) -> Unit,
+    val onConfirmHomeClockTagSelection: () -> Unit,
+    val onStartHomeClockUntagged: () -> Unit,
+    // Zero-Ratio Split Timer & Authentic YPT Group Study
+    val onAdjustCustomTimerSeconds: (Int) -> Unit,
+    val onSetSplitPosture: (SplitPosture) -> Unit,
+    val onToggleSplitView: () -> Unit,
+    val onInspectYptMember: (String?) -> Unit,
+    val onSendSilentBoost: (String) -> Unit,
+    val onOpenAllowedAppsSheet: () -> Unit,
+    val onCloseAllowedAppsSheet: () -> Unit,
+    val onToggleAllowedApp: (String) -> Unit,
+    // Materialized Daily Planner (28%/Drawer AI, Appeals, 3-Edit Tasks)
+    val onSetPlannerAiSidePanelOpen: (Boolean) -> Unit,
+    val onOpenSimulatedRagSheet: () -> Unit,
+    val onCloseSimulatedRagSheet: () -> Unit,
+    val onOpenAppealForBlock: (StandalonePlannerTask) -> Unit,
+    val onSelectAppealPresetReason: (String) -> Unit,
+    val onUpdateAppealCustomReason: (String) -> Unit,
+    val onSubmitAppeal: (PlannerAppealOutcome?) -> Unit,
+    val onApplyApprovedAppeal: () -> Unit,
+    val onDismissAppeal: () -> Unit,
+    val onTogglePlannerUserTaskCompleted: (String) -> Unit,
+    val onAddPlannerUserTask: (title: String, subject: String, durationMin: Int) -> Unit,
+    val onManualEditPlannerUserTask: (taskId: String, title: String, timeWindow: String, durationMin: Int) -> Unit,
+    val onRequestAiReauthorizeManualEdits: () -> Unit,
+    val onUpdatePlannerAiSideComposer: (String) -> Unit,
+    val onSendPlannerAiSidePrompt: (String) -> Unit,
+)
+
 @Composable
 fun WorkspaceShell(
     uiState: WorkspaceUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
     onSelectTab: (WorkspaceTab) -> Unit,
     onSelectAppTheme: (AppThemeId) -> Unit,
     onOpenSettings: () -> Unit,
@@ -254,6 +314,7 @@ fun WorkspaceShell(
     onRetakeFullQuiz: () -> Unit,
     onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
     phase163Actions: Phase163Actions,
+    phase164Actions: Phase164Actions,
     onNavigateBackToHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -262,6 +323,8 @@ fun WorkspaceShell(
     val canHandleBack = uiState.isSettingsOpen ||
         uiState.activeTab != WorkspaceTab.HOME ||
         uiState.homeCommandState.activeDailyPage != null ||
+        uiState.homeClockTagPicker.isOpen ||
+        uiState.settingsPrefs.showResetDemoConfirmDialog ||
         uiState.inspectSelection != null
 
     BackHandler(enabled = canHandleBack) {
@@ -318,6 +381,7 @@ fun WorkspaceShell(
                     if (showVaultLockBanner) {
                         ActiveTimerVaultLockBanner(
                             timerState = uiState.studyTimerGroupState,
+                            clockTickFlow = clockTickFlow,
                             onReturnToTimer = phase163Actions.onReturnToActiveTimerFromVault,
                         )
                     }
@@ -328,6 +392,7 @@ fun WorkspaceShell(
                     ) {
                     WorkspaceStage(
                         uiState = uiState,
+                        clockTickFlow = clockTickFlow,
                         isWideLayout = true,
                         onSelectTab = onSelectTab,
                         onSelectAppTheme = onSelectAppTheme,
@@ -417,6 +482,7 @@ fun WorkspaceShell(
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
                         phase163Actions = phase163Actions,
+                        phase164Actions = phase164Actions,
                     )
                     }
                 }
@@ -443,6 +509,7 @@ fun WorkspaceShell(
                     if (showVaultLockBanner) {
                         ActiveTimerVaultLockBanner(
                             timerState = uiState.studyTimerGroupState,
+                            clockTickFlow = clockTickFlow,
                             onReturnToTimer = phase163Actions.onReturnToActiveTimerFromVault,
                         )
                     }
@@ -453,6 +520,7 @@ fun WorkspaceShell(
                     ) {
                     WorkspaceStage(
                         uiState = uiState,
+                        clockTickFlow = clockTickFlow,
                         isWideLayout = false,
                         onSelectTab = onSelectTab,
                         onSelectAppTheme = onSelectAppTheme,
@@ -542,6 +610,7 @@ fun WorkspaceShell(
                         onRetakeFullQuiz = onRetakeFullQuiz,
                         onStudyWeakChapterInTutor = onStudyWeakChapterInTutor,
                         phase163Actions = phase163Actions,
+                        phase164Actions = phase164Actions,
                     )
                     }
                 }
@@ -561,15 +630,11 @@ fun WorkspaceShell(
 @Composable
 private fun ActiveTimerVaultLockBanner(
     timerState: StudyTimerGroupUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
     onReturnToTimer: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     val accent = timerState.activeSubjectMood.accent
-    val displaySec = if (timerState.mode == StudyTimerMode.POMODORO) {
-        timerState.remainingSeconds
-    } else {
-        timerState.elapsedSeconds
-    }
     val tagLabel = timerState.activeSubjectName ?: "Tagless Focus"
 
     Surface(
@@ -598,12 +663,12 @@ private fun ActiveTimerVaultLockBanner(
                 tint = accent,
                 modifier = Modifier.size(16.dp),
             )
-            Text(
-                text = formatDurationHms(displaySec),
+            LiveClockTickTextLeaf(
+                clockTickFlow = clockTickFlow,
+                textProvider = { tick -> formatDurationHms(tick.displaySeconds) },
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontFeatureSettings = "tnum",
                 ),
                 color = accent,
             )
@@ -683,6 +748,7 @@ private fun ActiveTimerVaultLockBanner(
 @Composable
 private fun WorkspaceStage(
     uiState: WorkspaceUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
     isWideLayout: Boolean,
     onSelectTab: (WorkspaceTab) -> Unit,
     onSelectAppTheme: (AppThemeId) -> Unit,
@@ -778,11 +844,9 @@ private fun WorkspaceStage(
     onRetakeFullQuiz: () -> Unit,
     onStudyWeakChapterInTutor: (batchId: String, chapterId: String) -> Unit,
     phase163Actions: Phase163Actions,
+    phase164Actions: Phase164Actions,
 ) {
-    val spatialSpring = spring<IntOffset>(
-        dampingRatio = 0.88f,
-        stiffness = 420f,
-    )
+    val spatialSpring = uiState.settingsPrefs.motionIntensity.springSpec<IntOffset>()
 
     AnimatedContent(
         targetState = if (uiState.isSettingsOpen) null else uiState.activeTab,
@@ -808,19 +872,33 @@ private fun WorkspaceStage(
                 activeMood = uiState.accentMood,
                 focusMode = uiState.focusMode,
                 ragHubState = uiState.settingsRagHubState,
+                settingsPrefs = uiState.settingsPrefs,
                 isWideLayout = isWideLayout,
                 onSelectSection = phase163Actions.onSelectSettingsSection,
                 onSelectTheme = onSelectAppTheme,
+                onSelectClockTheme = phase164Actions.onSelectClockTheme,
+                onSelectMotionIntensity = phase164Actions.onSelectMotionIntensity,
+                onSelectLayoutDensity = phase164Actions.onSelectLayoutDensity,
+                onAdjustDefaultFocusMinutes = phase164Actions.onAdjustDefaultFocusMinutes,
+                onAdjustDefaultBreakMinutes = phase164Actions.onAdjustDefaultBreakMinutes,
+                onToggleAutoLogStudy = phase164Actions.onToggleAutoLogStudySessions,
+                onSelectSubjectIndicatorStyle = phase164Actions.onSelectSubjectIndicatorStyle,
                 onSelectAccentMood = onSelectAccentMood,
                 onToggleFocusMode = onToggleFocusMode,
+                onToggleAiPlanner = phase163Actions.onToggleStandaloneAiPlanner,
+                onAdjustManualEditCap = phase164Actions.onAdjustManualTaskEditCap,
                 onSelectRagFile = phase163Actions.onSelectSettingsRagFile,
                 onUpdateRagUserNote = phase163Actions.onUpdateSettingsRagUserNote,
                 onRunRagAiOptimization = phase163Actions.onRunSettingsRagAiOptimization,
+                onRequestResetDemoState = phase164Actions.onRequestResetDemoState,
+                onConfirmResetDemoState = phase164Actions.onConfirmResetDemoState,
+                onDismissResetDemoDialog = phase164Actions.onDismissResetDemoDialog,
                 onCloseSettings = onCloseSettings,
             )
 
             WorkspaceTab.HOME -> HomeCommandCenter(
                 uiState = uiState,
+                clockTickFlow = clockTickFlow,
                 isWideLayout = isWideLayout,
                 onOpenSettings = onOpenSettings,
                 onToggleFocusMode = onToggleFocusMode,
@@ -840,6 +918,16 @@ private fun WorkspaceStage(
                 onQuickOpenAiTutor = { onSelectTab(WorkspaceTab.AI_TUTOR) },
                 onQuickOpenQuizzes = { onSelectTab(WorkspaceTab.QUIZZES) },
                 onQuickOpenStudyTimer = { onSelectTab(WorkspaceTab.TIMER_GROUP) },
+                onQuickOpenPlanner = { onSelectTab(WorkspaceTab.DAILY_PLANNER) },
+                onOpenHomeClockTagPicker = phase164Actions.onOpenHomeClockTagPicker,
+                onDismissHomeClockTagPicker = phase164Actions.onDismissHomeClockTagPicker,
+                onSelectHomeClockBatch = phase164Actions.onSelectHomeClockBatch,
+                onSelectHomeClockSubject = phase164Actions.onSelectHomeClockSubject,
+                onSelectHomeClockChapter = phase164Actions.onSelectHomeClockChapter,
+                onSelectHomeClockLecture = phase164Actions.onSelectHomeClockLecture,
+                onConfirmHomeClockTagSelection = phase164Actions.onConfirmHomeClockTagSelection,
+                onStartHomeClockUntagged = phase164Actions.onStartHomeClockUntagged,
+                onTogglePlannerUserTask = phase164Actions.onTogglePlannerUserTaskCompleted,
             )
 
             WorkspaceTab.BATCHES -> BatchesScreen(
@@ -945,37 +1033,44 @@ private fun WorkspaceStage(
 
             WorkspaceTab.DAILY_PLANNER -> StandaloneDailyPlannerScreen(
                 state = uiState.standalonePlannerState,
+                motionIntensity = uiState.settingsPrefs.motionIntensity,
                 isWideLayout = isWideLayout,
                 onOpenSettings = onOpenSettings,
                 onOpenRagInSettings = phase163Actions.onOpenSettingsAtRagFile,
-                onToggleAiPlanner = phase163Actions.onToggleStandaloneAiPlanner,
+                onSetAiSidePanelOpen = phase164Actions.onSetPlannerAiSidePanelOpen,
                 onReopenZeroContextWindow = phase163Actions.onReopenPlannerZeroContextWindow,
+                onOpenSimulatedRagSheet = phase164Actions.onOpenSimulatedRagSheet,
+                onCloseSimulatedRagSheet = phase164Actions.onCloseSimulatedRagSheet,
                 onSimulateFirstTimeIngestion = phase163Actions.onSimulateFirstTimePlannerIngestion,
                 onRefreshRag2 = phase163Actions.onRefreshPlannerRag2,
-                onRequestConfirmSchedule = phase163Actions.onRequestConfirmDailySchedule,
-                onToggleTaskCompleted = phase163Actions.onToggleStandaloneTaskCompleted,
-                onRequestAddTask = phase163Actions.onRequestAddStandaloneTask,
-                onRequestEditTask = phase163Actions.onRequestEditStandaloneTask,
-                onRequestCancelTask = phase163Actions.onRequestCancelStandaloneTask,
-                onUpdateGateTitle = phase163Actions.onUpdatePlannerGateTitle,
-                onUpdateGateTimeWindow = phase163Actions.onUpdatePlannerGateTimeWindow,
-                onUpdateGateReason = phase163Actions.onUpdatePlannerGateReason,
-                onSimulateGateOutcome = phase163Actions.onSimulatePlannerGateOutcome,
-                onApplyGateApproved = phase163Actions.onApplyPlannerGateApproved,
-                onAcceptGateCounterProposal = phase163Actions.onAcceptPlannerGateCounterProposal,
-                onDismissGate = phase163Actions.onDismissPlannerGate,
+                onToggleScheduleBlockCompleted = phase163Actions.onToggleStandaloneTaskCompleted,
+                onOpenAppealForBlock = phase164Actions.onOpenAppealForBlock,
+                onSelectAppealPresetReason = phase164Actions.onSelectAppealPresetReason,
+                onUpdateAppealCustomReason = phase164Actions.onUpdateAppealCustomReason,
+                onSubmitAppeal = phase164Actions.onSubmitAppeal,
+                onApplyApprovedAppeal = phase164Actions.onApplyApprovedAppeal,
+                onDismissAppeal = phase164Actions.onDismissAppeal,
+                onToggleUserTaskCompleted = phase164Actions.onTogglePlannerUserTaskCompleted,
+                onAddUserTask = phase164Actions.onAddPlannerUserTask,
+                onManualEditUserTask = phase164Actions.onManualEditPlannerUserTask,
+                onRequestAiReauthorizeManualEdits = phase164Actions.onRequestAiReauthorizeManualEdits,
+                onUpdateAiSideComposer = phase164Actions.onUpdatePlannerAiSideComposer,
+                onSendAiSidePrompt = phase164Actions.onSendPlannerAiSidePrompt,
                 onDismissStatusNotice = phase163Actions.onDismissPlannerNotice,
             )
 
             WorkspaceTab.TIMER_GROUP -> StudyTimerAndGroupScreen(
                 state = uiState.studyTimerGroupState,
+                clockTickFlow = clockTickFlow,
+                clockTheme = uiState.settingsPrefs.clockTheme,
+                motionIntensity = uiState.settingsPrefs.motionIntensity,
                 subjects = uiState.pwVaultState.subjectsByBatch[uiState.primaryBatchId].orEmpty(),
                 isWideLayout = isWideLayout,
                 onExitToHome = { onSelectTab(WorkspaceTab.HOME) },
                 onOpenVaultWhileTimerActive = phase163Actions.onOpenVaultWhileTimerActive,
                 onSelectMode = phase163Actions.onSelectTimerMode,
-                onSelectPomodoroStyle = phase163Actions.onSelectPomodoroStyle,
                 onApplyPomodoroPreset = phase163Actions.onApplyPomodoroPreset,
+                onAdjustCustomTimerSeconds = phase164Actions.onAdjustCustomTimerSeconds,
                 onSwitchPomodoroPhase = phase163Actions.onSwitchPomodoroPhase,
                 onAddFiveMinutes = phase163Actions.onAddFiveMinutesToTimer,
                 onRequestStartFromMainButton = phase163Actions.onRequestStartFromMainTimerButton,
@@ -986,8 +1081,8 @@ private fun WorkspaceStage(
                 onPauseResumeTimer = phase163Actions.onPauseOrResumeStudyTimer,
                 onResetTimer = phase163Actions.onResetStudyTimer,
                 onStopAndLogTimer = phase163Actions.onStopAndLogStudyTimer,
-                onSetSplitRatio = phase163Actions.onSetTimerSplitRatio,
-                onToggleGroupStudySplit = phase163Actions.onToggleGroupStudySplit,
+                onSetSplitPosture = phase164Actions.onSetSplitPosture,
+                onToggleSplitView = phase164Actions.onToggleSplitView,
                 onOpenStatsSheet = phase163Actions.onOpenTimerStatsSheet,
                 onCloseStatsSheet = phase163Actions.onCloseTimerStatsSheet,
                 onJoinGroup = phase163Actions.onJoinYptGroup,
@@ -995,6 +1090,11 @@ private fun WorkspaceStage(
                 onCloseCreateGroupDialog = phase163Actions.onCloseCreateYptGroupDialog,
                 onCreatePublicGroup = phase163Actions.onCreatePublicYptGroup,
                 onSelectUserStatus = phase163Actions.onSelectYptUserStatus,
+                onInspectYptMember = phase164Actions.onInspectYptMember,
+                onSendSilentBoost = phase164Actions.onSendSilentBoost,
+                onOpenAllowedAppsSheet = phase164Actions.onOpenAllowedAppsSheet,
+                onCloseAllowedAppsSheet = phase164Actions.onCloseAllowedAppsSheet,
+                onToggleAllowedApp = phase164Actions.onToggleAllowedApp,
                 onDismissLockNotice = phase163Actions.onDismissSingleTimerLockNotice,
             )
         }

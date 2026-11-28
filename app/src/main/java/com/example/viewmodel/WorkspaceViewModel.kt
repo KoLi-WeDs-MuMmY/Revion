@@ -9,11 +9,13 @@ import com.example.data.mock.Phase163MockData
 import com.example.model.ActiveQuizSession
 import com.example.model.AiPermissionRequest
 import com.example.model.AppRagFileId
+import com.example.model.AppSettingsPreferences
 import com.example.model.BatchChapter
 import com.example.model.BatchCrudDialog
 import com.example.model.BatchSubject
 import com.example.model.BatchesUiState
 import com.example.model.ChapterDiagramRef
+import com.example.model.ClockThemeId
 import com.example.model.CounterProposal
 import com.example.model.DailyFlashcardItem
 import com.example.model.DailyPageRoute
@@ -25,11 +27,15 @@ import com.example.model.FlashcardRating
 import com.example.model.FlashcardsMistakesUiState
 import com.example.model.FocusMode
 import com.example.model.GrokTutorUiState
+import com.example.model.HomeClockTagPickerState
 import com.example.model.HomeCommandState
 import com.example.model.InspectSelection
+import com.example.model.LayoutDensityMode
+import com.example.model.LiveClockTick
 import com.example.model.LoggedTopic
 import com.example.model.MaterialType
 import com.example.model.MistakeCategory
+import com.example.model.MotionIntensity
 import com.example.model.PermissionRequestAction
 import com.example.model.PermissionVerdictPhase
 import com.example.model.Phase12MockData
@@ -40,9 +46,13 @@ import com.example.model.Phase161MockData
 import com.example.model.PlannerAiDecisionOutcome
 import com.example.model.PlannerAiGateActionType
 import com.example.model.PlannerAiGateRequest
+import com.example.model.PlannerAiSideMessage
+import com.example.model.PlannerAppealOutcome
+import com.example.model.PlannerAppealRequest
 import com.example.model.PlannerApprovalStatus
 import com.example.model.PlannerBlock
 import com.example.model.PlannerBlockCategory
+import com.example.model.PlannerUserTask
 import com.example.model.PomodoroPhase
 import com.example.model.PomodoroRingStyle
 import com.example.model.PresetSubjectTemplate
@@ -56,10 +66,13 @@ import com.example.model.SettingsSectionTab
 import com.example.model.SpacedFlashcard
 import com.example.model.SpacedIntervalBucket
 import com.example.model.SpacedReviewItem
+import com.example.model.SplitPosture
 import com.example.model.StandalonePlannerTask
 import com.example.model.StudyBatch
 import com.example.model.StudySessionLogEntry
+import com.example.model.StudyTimerGroupUiState
 import com.example.model.StudyTimerMode
+import com.example.model.SubjectIndicatorStyle
 import com.example.model.SubjectMastery
 import com.example.model.TestArenaMode
 import com.example.model.TimerSessionSource
@@ -100,6 +113,13 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _uiState = MutableStateFlow(createInitialMockState())
     val uiState: StateFlow<WorkspaceUiState> = _uiState.asStateFlow()
+
+    /**
+     * Dedicated 1-second leaf tick stream so MainActivity, WorkspaceShell, NavRail,
+     * and non-clock UI cards NEVER recompose on timer ticks.
+     */
+    private val _clockTick = MutableStateFlow(LiveClockTick())
+    val clockTick: StateFlow<LiveClockTick> = _clockTick.asStateFlow()
 
     private var tutorReplyJob: Job? = null
     private var grokTutorReplyJob: Job? = null
@@ -3352,7 +3372,626 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // --- Phase 1.6.3: Synced Study Timer & YPT Group Study Actions ---
+    // --- Phase 1.6.4: Materialized Daily Planner (28% / Drawer AI, Appeal System, 3-Edit Tasks) ---
+
+    fun setPlannerAiSidePanelOpen(open: Boolean) {
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            if (open && !p.isAiSidePanelOpen) {
+                val nextSession = p.windowSessionNumber + 1
+                state.copy(
+                    standalonePlannerState = p.copy(
+                        isAiSidePanelOpen = true,
+                        windowSessionNumber = nextSession,
+                        zeroContextTurnCount = 0,
+                        aiSideMessages = Phase163MockData.createZeroContextPlannerGreeting(
+                            sessionNumber = nextSession,
+                            rag1 = p.rag1,
+                            rag2 = p.rag2,
+                        ),
+                    ),
+                )
+            } else {
+                state.copy(
+                    standalonePlannerState = p.copy(isAiSidePanelOpen = open),
+                )
+            }
+        }
+    }
+
+    fun openSimulatedRagSheet() {
+        _uiState.update { state ->
+            state.copy(standalonePlannerState = state.standalonePlannerState.copy(showSimulatedRagSheet = true))
+        }
+    }
+
+    fun closeSimulatedRagSheet() {
+        _uiState.update { state ->
+            state.copy(standalonePlannerState = state.standalonePlannerState.copy(showSimulatedRagSheet = false))
+        }
+    }
+
+    fun openAppealForBlock(block: StandalonePlannerTask) {
+        _uiState.update { state ->
+            state.copy(
+                standalonePlannerState = state.standalonePlannerState.copy(
+                    activeAppeal = PlannerAppealRequest(
+                        blockId = block.id,
+                        blockTitle = block.title,
+                        blockSubject = block.subjectName,
+                        blockTimeWindow = block.timeWindow,
+                        blockDurationMinutes = block.durationMinutes,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun selectAppealPresetReason(reason: String) {
+        _uiState.update { state ->
+            val appeal = state.standalonePlannerState.activeAppeal ?: return@update state
+            state.copy(
+                standalonePlannerState = state.standalonePlannerState.copy(
+                    activeAppeal = appeal.copy(
+                        selectedPresetReason = reason,
+                        outcome = PlannerAppealOutcome.PENDING,
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun updateAppealCustomReason(reason: String) {
+        _uiState.update { state ->
+            val appeal = state.standalonePlannerState.activeAppeal ?: return@update state
+            state.copy(
+                standalonePlannerState = state.standalonePlannerState.copy(
+                    activeAppeal = appeal.copy(customReason = reason),
+                ),
+            )
+        }
+    }
+
+    fun submitAppeal(forceOutcome: PlannerAppealOutcome? = null) {
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val appeal = p.activeAppeal ?: return@update state
+            val reasonLower = "${appeal.selectedPresetReason} ${appeal.customReason}".lowercase()
+            val resolvedOutcome = forceOutcome ?: if (
+                reasonLower.contains("skip") || reasonLower.contains("cancel") || reasonLower.contains("late")
+            ) {
+                PlannerAppealOutcome.DECLINED
+            } else {
+                PlannerAppealOutcome.APPROVED_UPDATED
+            }
+
+            val updatedAppeal = when (resolvedOutcome) {
+                PlannerAppealOutcome.APPROVED_UPDATED -> {
+                    val trimmedDur = (appeal.blockDurationMinutes - 15).coerceAtLeast(35)
+                    val newSlot = if (appeal.blockTimeWindow.startsWith("09")) "10:00 – 11:15" else "17:45 – 18:45"
+                    appeal.copy(
+                        outcome = PlannerAppealOutcome.APPROVED_UPDATED,
+                        aiVerdictTitle = "Appeal Approved · Schedule Adjusted",
+                        aiVerdictExplanation = "Simulated RAG(2) shows your morning/evening focus buffer can absorb this shift. Rescheduled to $newSlot (${trimmedDur}m) without hurting weak-topic coverage.",
+                        updatedTimeWindow = newSlot,
+                        updatedDurationMinutes = trimmedDur,
+                    )
+                }
+
+                PlannerAppealOutcome.DECLINED -> appeal.copy(
+                    outcome = PlannerAppealOutcome.DECLINED,
+                    aiVerdictTitle = "Appeal Declined · Peak Window Protected",
+                    aiVerdictExplanation = "Simulated RAG(1) 20-day baseline flags a 38% completion drop whenever ${appeal.blockSubject} is moved outside ${p.rag2.peakFocusWindow}. Keep the original slot or split into two Pomodoros.",
+                    updatedTimeWindow = null,
+                    updatedDurationMinutes = null,
+                )
+
+                PlannerAppealOutcome.PENDING -> appeal
+            }
+
+            state.copy(
+                standalonePlannerState = p.copy(
+                    activeAppeal = updatedAppeal,
+                    zeroContextTurnCount = p.zeroContextTurnCount + 1,
+                ),
+            )
+        }
+    }
+
+    fun applyApprovedAppeal() {
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val appeal = p.activeAppeal ?: return@update state
+            if (appeal.outcome != PlannerAppealOutcome.APPROVED_UPDATED) return@update state
+            val nextWindow = appeal.updatedTimeWindow ?: appeal.blockTimeWindow
+            val nextDuration = appeal.updatedDurationMinutes ?: appeal.blockDurationMinutes
+            state.copy(
+                standalonePlannerState = p.copy(
+                    tasks = p.tasks.map { blk ->
+                        if (blk.id == appeal.blockId) {
+                            blk.copy(
+                                timeWindow = nextWindow,
+                                durationMinutes = nextDuration,
+                                aiStatusNote = "Updated via AI-approved appeal ($nextWindow)",
+                            )
+                        } else blk
+                    },
+                    activeAppeal = null,
+                    statusNotice = "Appeal applied: ${appeal.blockSubject} moved to $nextWindow (${nextDuration}m).",
+                ),
+            )
+        }
+    }
+
+    fun dismissAppeal() {
+        _uiState.update { state ->
+            state.copy(standalonePlannerState = state.standalonePlannerState.copy(activeAppeal = null))
+        }
+    }
+
+    fun togglePlannerUserTaskCompleted(taskId: String) {
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val updated = p.userTasks.map { t ->
+                if (t.id == taskId) t.copy(isCompleted = !t.isCompleted) else t
+            }
+            val nextPlanner = p.copy(userTasks = updated)
+            state.copy(
+                standalonePlannerState = nextPlanner.copy(
+                    rag2 = p.rag2.copy(taskCompletedPercent = nextPlanner.liveTaskCompletionPercent),
+                ),
+            )
+        }
+    }
+
+    fun addPlannerUserTask(title: String, subject: String, durationMin: Int) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        val cleanSubject = subject.trim().ifEmpty { "General" }
+        val mood = when (cleanSubject.lowercase()) {
+            "physics" -> AccentMood.CYAN
+            "chemistry" -> AccentMood.VIOLET
+            "biology" -> AccentMood.EMERALD
+            "maths", "mathematics" -> AccentMood.AMBER
+            else -> AccentMood.CYAN
+        }
+        val safeDur = durationMin.coerceIn(10, 180)
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val slotHour = (16 + (p.userTasks.size % 4)).coerceAtMost(21)
+            val slottedWindow = "%02d:00 – %02d:%02d".format(
+                slotHour,
+                (slotHour + (safeDur / 60)).coerceAtMost(22),
+                safeDur % 60,
+            )
+            val newTask = PlannerUserTask(
+                id = "utask_${System.currentTimeMillis()}",
+                title = cleanTitle,
+                subjectName = cleanSubject,
+                accentMood = mood,
+                slottedTimeWindow = slottedWindow,
+                durationMinutes = safeDur,
+                isCompleted = false,
+                aiSlotNote = "AI auto-slotted around simulated peak windows",
+            )
+            val nextPlanner = p.copy(
+                userTasks = p.userTasks + newTask,
+                statusNotice = "AI auto-slotted \"$cleanTitle\" into $slottedWindow (${safeDur}m).",
+            )
+            state.copy(
+                standalonePlannerState = nextPlanner.copy(
+                    rag2 = p.rag2.copy(taskCompletedPercent = nextPlanner.liveTaskCompletionPercent),
+                ),
+            )
+        }
+    }
+
+    fun manualEditPlannerUserTask(taskId: String, title: String, timeWindow: String, durationMin: Int) {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            if (p.isManualTaskEditingLocked) {
+                return@update state.copy(
+                    standalonePlannerState = p.copy(
+                        statusNotice = "Manual edits are locked by AI Intervention. Request AI re-authorization first.",
+                    ),
+                )
+            }
+            val nextEditsUsed = p.manualEditsUsed + 1
+            val editedTasks = p.userTasks.map { t ->
+                if (t.id == taskId) {
+                    t.copy(
+                        title = cleanTitle,
+                        slottedTimeWindow = timeWindow.trim().ifEmpty { t.slottedTimeWindow },
+                        durationMinutes = durationMin.coerceIn(10, 180),
+                        editCount = t.editCount + 1,
+                        aiSlotNote = "Manually edited ($nextEditsUsed/${p.manualEditCap})",
+                    )
+                } else t
+            }
+            if (nextEditsUsed >= p.manualEditCap) {
+                // Automatic AI Intervention: rebalance incomplete tasks cleanly and lock further manual edits
+                val balancedSlots = listOf("16:15 – 16:45", "17:00 – 17:35", "18:00 – 18:45", "20:10 – 20:45", "21:00 – 21:30")
+                var slotIdx = 0
+                val rebalancedTasks = editedTasks.map { t ->
+                    if (!t.isCompleted) {
+                        val slot = balancedSlots[slotIdx % balancedSlots.size]
+                        slotIdx++
+                        t.copy(
+                            slottedTimeWindow = slot,
+                            aiSlotNote = "Re-balanced by AI Intervention",
+                        )
+                    } else t
+                }
+                val interventionMsg = PlannerAiSideMessage(
+                    id = "ai_int_${System.currentTimeMillis()}",
+                    isUser = false,
+                    text = "AI Intervention triggered after $nextEditsUsed/${p.manualEditCap} manual task edits. I re-balanced your open tasks around simulated peak windows to prevent schedule fragmentation and locked manual edits until you request re-authorization.",
+                    tagLabel = "AI INTERVENTION",
+                )
+                state.copy(
+                    standalonePlannerState = p.copy(
+                        userTasks = rebalancedTasks,
+                        manualEditsUsed = nextEditsUsed,
+                        isManualTaskEditingLocked = true,
+                        aiInterventionBanner = "AI Intervention Active · Limit $nextEditsUsed/${p.manualEditCap} reached. Tasks were automatically re-balanced and manual editing is locked until AI re-authorizes.",
+                        aiSideMessages = p.aiSideMessages + interventionMsg,
+                        statusNotice = "Manual edit cap reached ($nextEditsUsed/${p.manualEditCap}) — AI Intervention re-balanced your tasks.",
+                    ),
+                )
+            } else {
+                state.copy(
+                    standalonePlannerState = p.copy(
+                        userTasks = editedTasks,
+                        manualEditsUsed = nextEditsUsed,
+                        statusNotice = "Task updated (${p.manualEditCap - nextEditsUsed} manual edits remaining before AI Intervention).",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun requestAiReauthorizeManualEdits() {
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val reauthMsg = PlannerAiSideMessage(
+                id = "ai_reauth_${System.currentTimeMillis()}",
+                isUser = false,
+                text = "AI Re-Authorized: Unlocked ${p.manualEditCap} fresh manual edits. Keep high-weightage Physics/Maths tasks inside your simulated 07:30–11:00 or 18:30–21:00 focus blocks.",
+                tagLabel = "RE-AUTHORIZED",
+            )
+            state.copy(
+                standalonePlannerState = p.copy(
+                    manualEditsUsed = 0,
+                    isManualTaskEditingLocked = false,
+                    aiInterventionBanner = null,
+                    aiSideMessages = p.aiSideMessages + reauthMsg,
+                    statusNotice = "AI unlocked ${p.manualEditCap} fresh manual edits.",
+                ),
+            )
+        }
+    }
+
+    fun updatePlannerAiSideComposer(text: String) {
+        _uiState.update { state ->
+            state.copy(standalonePlannerState = state.standalonePlannerState.copy(aiSideComposerText = text))
+        }
+    }
+
+    fun sendPlannerAiSidePrompt(rawPrompt: String) {
+        val clean = rawPrompt.trim()
+        if (clean.isEmpty()) return
+        _uiState.update { state ->
+            val p = state.standalonePlannerState
+            val now = System.currentTimeMillis()
+            val userMsg = PlannerAiSideMessage(
+                id = "u_msg_$now",
+                isUser = true,
+                text = clean,
+                tagLabel = "YOU",
+            )
+            val lower = clean.lowercase()
+            val replyText = when {
+                lower.contains("unlock") || lower.contains("edit") ->
+                    "To protect consistency, manual task edits are capped at ${p.manualEditCap}. Tap 'Ask AI to Re-Authorize' in the Tasks card if you need a fresh allowance, or use Appeal on any AI schedule block."
+                lower.contains("peak") || lower.contains("best") || lower.contains("focus") ->
+                    "Based on simulated RAG(2), your sharpest focus occurs during ${p.rag2.peakFocusWindow} (91% completion). Keep heavy numericals there and save passive flashcards for post-20:30."
+                lower.contains("light") || lower.contains("tired") || lower.contains("heavy") ->
+                    "If today feels heavy, tap Appeal on an evening block — I can trim 15 minutes or shift it into an earlier buffer without dropping your 20-day ${p.rag1.oneMonthAvgStudyHours}h/d simulated streak."
+                else ->
+                    "Zero-context check (Window #${p.windowSessionNumber}): You're at ${p.liveTaskCompletionPercent}% completion today. Simulated RAG(1) shows best retention when screen time stays below 4.0h — start your next block with the Flip Clock."
+            }
+            val aiMsg = PlannerAiSideMessage(
+                id = "a_msg_${now + 1}",
+                isUser = false,
+                text = replyText,
+                tagLabel = "SIMULATED RAG(1)+RAG(2)",
+            )
+            state.copy(
+                standalonePlannerState = p.copy(
+                    aiSideMessages = p.aiSideMessages + userMsg + aiMsg,
+                    aiSideComposerText = "",
+                    zeroContextTurnCount = p.zeroContextTurnCount + 1,
+                ),
+            )
+        }
+    }
+
+    // --- Phase 1.6.4: Structured Settings & Home Cascading Flip-Clock Actions ---
+
+    fun selectClockTheme(theme: ClockThemeId) {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(clockTheme = theme))
+        }
+    }
+
+    fun selectMotionIntensity(intensity: MotionIntensity) {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(motionIntensity = intensity))
+        }
+    }
+
+    fun selectLayoutDensity(density: LayoutDensityMode) {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(layoutDensity = density))
+        }
+    }
+
+    fun adjustDefaultFocusMinutes(delta: Int) {
+        _uiState.update { state ->
+            val nextFocus = (state.settingsPrefs.defaultFocusMinutes + delta).coerceIn(5, 180)
+            val t = state.studyTimerGroupState
+            val updatedTimer = if (!t.isTimerActiveSession) {
+                t.copy(
+                    focusDurationMinutes = nextFocus,
+                    customDurationSecondsRemainder = 0,
+                    remainingSeconds = nextFocus * 60,
+                )
+            } else {
+                t.copy(focusDurationMinutes = nextFocus)
+            }
+            syncClockTickFromTimerState(updatedTimer)
+            state.copy(
+                settingsPrefs = state.settingsPrefs.copy(defaultFocusMinutes = nextFocus),
+                studyTimerGroupState = updatedTimer,
+            )
+        }
+    }
+
+    fun adjustDefaultBreakMinutes(delta: Int) {
+        _uiState.update { state ->
+            val nextBreak = (state.settingsPrefs.defaultBreakMinutes + delta).coerceIn(1, 60)
+            val updatedTimer = state.studyTimerGroupState.copy(breakDurationMinutes = nextBreak)
+            syncClockTickFromTimerState(updatedTimer)
+            state.copy(
+                settingsPrefs = state.settingsPrefs.copy(defaultBreakMinutes = nextBreak),
+                studyTimerGroupState = updatedTimer,
+            )
+        }
+    }
+
+    fun toggleAutoLogStudySessions(enabled: Boolean) {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(autoLogStudySessions = enabled))
+        }
+    }
+
+    fun selectSubjectIndicatorStyle(style: SubjectIndicatorStyle) {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(subjectIndicatorStyle = style))
+        }
+    }
+
+    fun adjustManualTaskEditCap(delta: Int) {
+        _uiState.update { state ->
+            val nextCap = (state.settingsPrefs.manualTaskEditCap + delta).coerceIn(2, 3)
+            val p = state.standalonePlannerState
+            state.copy(
+                settingsPrefs = state.settingsPrefs.copy(manualTaskEditCap = nextCap),
+                standalonePlannerState = p.copy(
+                    manualEditCap = nextCap,
+                    isManualTaskEditingLocked = p.manualEditsUsed >= nextCap,
+                ),
+            )
+        }
+    }
+
+    fun requestResetDemoState() {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(showResetDemoConfirmDialog = true))
+        }
+    }
+
+    fun dismissResetDemoDialog() {
+        _uiState.update { state ->
+            state.copy(settingsPrefs = state.settingsPrefs.copy(showResetDemoConfirmDialog = false))
+        }
+    }
+
+    fun confirmResetDemoState() {
+        studyTimerJob?.cancel()
+        examTimerJob?.cancel()
+        val fresh = createInitialMockState()
+        _uiState.value = fresh
+        _clockTick.value = LiveClockTick(
+            elapsedSeconds = 0,
+            remainingSeconds = fresh.studyTimerGroupState.remainingSeconds,
+            peerElapsedOffsetSeconds = 0,
+            isRunning = false,
+            isPaused = false,
+            mode = fresh.studyTimerGroupState.mode,
+            pomodoroPhase = fresh.studyTimerGroupState.pomodoroPhase,
+            focusDurationMinutes = fresh.studyTimerGroupState.focusDurationMinutes,
+            breakDurationMinutes = fresh.studyTimerGroupState.breakDurationMinutes,
+            timerSource = TimerSessionSource.MANUAL,
+        )
+    }
+
+    fun openHomeClockTagPicker(launchFullScreenOnConfirm: Boolean) {
+        _uiState.update { state ->
+            val batchId = state.primaryBatchId
+            val subjects = state.pwVaultState.subjectsByBatch[batchId].orEmpty()
+            val existingSubjId = state.studyTimerGroupState.activeSubjectId
+                ?.takeIf { id -> subjects.any { it.id == id } }
+                ?: subjects.firstOrNull()?.id
+            state.copy(
+                homeClockTagPicker = HomeClockTagPickerState(
+                    isOpen = true,
+                    launchFullScreenOnConfirm = launchFullScreenOnConfirm,
+                    selectedBatchId = batchId,
+                    selectedSubjectId = existingSubjId,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
+                ),
+            )
+        }
+    }
+
+    fun dismissHomeClockTagPicker() {
+        _uiState.update { state ->
+            state.copy(homeClockTagPicker = state.homeClockTagPicker.copy(isOpen = false))
+        }
+    }
+
+    fun selectHomeClockBatch(batchId: String) {
+        _uiState.update { state ->
+            val firstSubj = state.pwVaultState.subjectsByBatch[batchId].orEmpty().firstOrNull()?.id
+            state.copy(
+                homeClockTagPicker = state.homeClockTagPicker.copy(
+                    selectedBatchId = batchId,
+                    selectedSubjectId = firstSubj,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
+                ),
+            )
+        }
+    }
+
+    fun selectHomeClockSubject(subjectId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                homeClockTagPicker = state.homeClockTagPicker.copy(
+                    selectedSubjectId = subjectId,
+                    selectedChapterId = null,
+                    selectedLectureId = null,
+                ),
+            )
+        }
+    }
+
+    fun selectHomeClockChapter(chapterId: String?) {
+        _uiState.update { state ->
+            val cur = state.homeClockTagPicker.selectedChapterId
+            state.copy(
+                homeClockTagPicker = state.homeClockTagPicker.copy(
+                    selectedChapterId = if (cur == chapterId) null else chapterId,
+                    selectedLectureId = null,
+                ),
+            )
+        }
+    }
+
+    fun selectHomeClockLecture(lectureId: String?) {
+        _uiState.update { state ->
+            val cur = state.homeClockTagPicker.selectedLectureId
+            state.copy(
+                homeClockTagPicker = state.homeClockTagPicker.copy(
+                    selectedLectureId = if (cur == lectureId) null else lectureId,
+                ),
+            )
+        }
+    }
+
+    fun confirmHomeClockTagSelection() {
+        val state = _uiState.value
+        val picker = state.homeClockTagPicker
+        val batch = state.batchesState.batches.firstOrNull { it.id == picker.selectedBatchId }
+        val subject = state.pwVaultState.subjectsByBatch[picker.selectedBatchId].orEmpty()
+            .firstOrNull { it.id == picker.selectedSubjectId }
+        val chapter = subject?.chapters?.firstOrNull { it.id == picker.selectedChapterId }
+        val lecture = chapter?.lectures?.firstOrNull { it.id == picker.selectedLectureId }
+
+        if (picker.launchFullScreenOnConfirm) {
+            startManualTimerInternal(
+                subjectId = subject?.id,
+                subjectName = subject?.name,
+                subjectMood = subject?.accentMood ?: AccentMood.CYAN,
+                lectureId = lecture?.id,
+                lectureTitle = lecture?.title,
+                batchName = batch?.name,
+                chapterTitle = chapter?.title,
+                launchFullScreenHomeClock = true,
+            )
+        } else {
+            _uiState.update { s ->
+                s.copy(
+                    homeClockTagPicker = s.homeClockTagPicker.copy(isOpen = false),
+                    studyTimerGroupState = s.studyTimerGroupState.copy(
+                        activeBatchName = batch?.name,
+                        activeSubjectId = subject?.id,
+                        activeSubjectName = subject?.name,
+                        activeSubjectMood = subject?.accentMood ?: AccentMood.CYAN,
+                        activeChapterTitle = chapter?.title,
+                        syncedLectureId = lecture?.id,
+                        syncedLectureTitle = lecture?.title,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun startHomeClockUntagged() {
+        val picker = _uiState.value.homeClockTagPicker
+        if (picker.launchFullScreenOnConfirm) {
+            startManualTimerInternal(
+                subjectId = null,
+                subjectName = null,
+                subjectMood = AccentMood.CYAN,
+                lectureId = null,
+                lectureTitle = null,
+                batchName = null,
+                chapterTitle = null,
+                launchFullScreenHomeClock = true,
+            )
+        } else {
+            _uiState.update { s ->
+                s.copy(
+                    homeClockTagPicker = s.homeClockTagPicker.copy(isOpen = false),
+                    studyTimerGroupState = s.studyTimerGroupState.copy(
+                        activeBatchName = null,
+                        activeSubjectId = null,
+                        activeSubjectName = null,
+                        activeChapterTitle = null,
+                        syncedLectureId = null,
+                        syncedLectureTitle = null,
+                    ),
+                )
+            }
+        }
+    }
+
+    // --- Phase 1.6.3 / 1.6.4: Synced Study Timer & Authentic YPT Group Study Actions ---
+
+    private fun syncClockTickFromTimerState(
+        t: StudyTimerGroupUiState,
+        resetPeerOffset: Boolean = false,
+    ) {
+        _clockTick.update { cur ->
+            LiveClockTick(
+                elapsedSeconds = t.elapsedSeconds,
+                remainingSeconds = t.remainingSeconds,
+                peerElapsedOffsetSeconds = if (resetPeerOffset) 0 else cur.peerElapsedOffsetSeconds,
+                isRunning = t.isRunning,
+                isPaused = t.isPaused,
+                mode = t.mode,
+                pomodoroPhase = t.pomodoroPhase,
+                focusDurationMinutes = t.focusDurationMinutes,
+                breakDurationMinutes = t.breakDurationMinutes,
+                timerSource = t.timerSource,
+            )
+        }
+    }
 
     fun selectTimerMode(mode: StudyTimerMode) {
         _uiState.update { state ->
@@ -3364,15 +4003,15 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
                     ),
                 )
             }
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    mode = mode,
-                    elapsedSeconds = 0,
-                    remainingSeconds = t.focusDurationMinutes * 60,
-                    pomodoroPhase = PomodoroPhase.FOCUS,
-                    singleTimerLockNotice = null,
-                ),
+            val nextTimer = t.copy(
+                mode = mode,
+                elapsedSeconds = 0,
+                remainingSeconds = (t.focusDurationMinutes * 60) + t.customDurationSecondsRemainder,
+                pomodoroPhase = PomodoroPhase.FOCUS,
+                singleTimerLockNotice = null,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
     }
 
@@ -3394,15 +4033,37 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
                     ),
                 )
             }
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    focusDurationMinutes = focusMinutes,
-                    breakDurationMinutes = breakMinutes,
-                    pomodoroPhase = PomodoroPhase.FOCUS,
-                    remainingSeconds = focusMinutes * 60,
-                    elapsedSeconds = 0,
-                ),
+            val nextTimer = t.copy(
+                focusDurationMinutes = focusMinutes,
+                breakDurationMinutes = breakMinutes,
+                customDurationSecondsRemainder = 0,
+                pomodoroPhase = PomodoroPhase.FOCUS,
+                remainingSeconds = focusMinutes * 60,
+                elapsedSeconds = 0,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
+        }
+    }
+
+    fun adjustCustomTimerSeconds(deltaSeconds: Int) {
+        _uiState.update { state ->
+            val t = state.studyTimerGroupState
+            if (t.isTimerActiveSession) return@update state
+            val baseSec = if (t.pomodoroPhase == PomodoroPhase.FOCUS) {
+                t.remainingSeconds
+            } else {
+                t.breakDurationMinutes * 60
+            }
+            val nextSec = (baseSec + deltaSeconds).coerceIn(60, 10800)
+            val nextTimer = t.copy(
+                focusDurationMinutes = (nextSec / 60).coerceAtLeast(1),
+                customDurationSecondsRemainder = nextSec % 60,
+                remainingSeconds = nextSec,
+                elapsedSeconds = 0,
+            )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
     }
 
@@ -3410,28 +4071,36 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { state ->
             val t = state.studyTimerGroupState
             val nextPhase = if (t.pomodoroPhase == PomodoroPhase.FOCUS) PomodoroPhase.BREAK else PomodoroPhase.FOCUS
-            val nextRemaining = (if (nextPhase == PomodoroPhase.FOCUS) t.focusDurationMinutes else t.breakDurationMinutes) * 60
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    pomodoroPhase = nextPhase,
-                    remainingSeconds = nextRemaining,
-                    userStatus = if (t.isRunning) {
-                        if (nextPhase == PomodoroPhase.BREAK) YptMemberStatus.ON_BREAK else YptMemberStatus.FOCUSING
-                    } else t.userStatus,
-                ),
+            val nextRemaining = if (nextPhase == PomodoroPhase.FOCUS) {
+                (t.focusDurationMinutes * 60) + t.customDurationSecondsRemainder
+            } else {
+                t.breakDurationMinutes * 60
+            }
+            val nextTimer = t.copy(
+                pomodoroPhase = nextPhase,
+                remainingSeconds = nextRemaining,
+                elapsedSeconds = _clockTick.value.elapsedSeconds,
+                userStatus = if (t.isRunning) {
+                    if (nextPhase == PomodoroPhase.BREAK) YptMemberStatus.ON_BREAK else YptMemberStatus.FOCUSING
+                } else t.userStatus,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
     }
 
     fun addFiveMinutesToTimer() {
         _uiState.update { state ->
             val t = state.studyTimerGroupState
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    remainingSeconds = t.remainingSeconds + 300,
-                    focusDurationMinutes = if (!t.isTimerActiveSession) t.focusDurationMinutes + 5 else t.focusDurationMinutes,
-                ),
+            val liveRemaining = if (t.isTimerActiveSession) _clockTick.value.remainingSeconds else t.remainingSeconds
+            val nextRemaining = (liveRemaining + 300).coerceAtMost(10800)
+            val nextTimer = t.copy(
+                remainingSeconds = nextRemaining,
+                elapsedSeconds = if (t.isTimerActiveSession) _clockTick.value.elapsedSeconds else t.elapsedSeconds,
+                focusDurationMinutes = if (!t.isTimerActiveSession) (nextRemaining / 60).coerceAtLeast(1) else t.focusDurationMinutes,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
     }
 
@@ -3458,7 +4127,7 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** Clicking directly on a Subject in high-timer view starts immediately with that Subject tag & 25:75 auto-split. */
+    /** Clicking directly on a Subject starts immediately with that Subject tag & opens split view. */
     fun quickStartSubjectTimer(subject: VaultSubjectNode) {
         val t = _uiState.value.studyTimerGroupState
         if (t.isTimerActiveSession) {
@@ -3512,28 +4181,45 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         subjectMood: AccentMood,
         lectureId: String?,
         lectureTitle: String?,
+        batchName: String? = null,
+        chapterTitle: String? = null,
+        launchFullScreenHomeClock: Boolean = false,
     ) {
         studyTimerJob?.cancel()
         _uiState.update { state ->
             val t = state.studyTimerGroupState
+            val startRemaining = if (t.pomodoroPhase == PomodoroPhase.FOCUS) {
+                (t.focusDurationMinutes * 60) + t.customDurationSecondsRemainder
+            } else {
+                t.breakDurationMinutes * 60
+            }
+            val nextPosture = if (launchFullScreenHomeClock) SplitPosture.FULL_TIMER else SplitPosture.WIDE_GROUP
+            val nextTimer = t.copy(
+                isRunning = true,
+                isPaused = false,
+                elapsedSeconds = 0,
+                remainingSeconds = startRemaining,
+                timerSource = TimerSessionSource.MANUAL,
+                activeBatchName = batchName ?: t.activeBatchName,
+                activeSubjectId = subjectId,
+                activeSubjectName = subjectName,
+                activeSubjectMood = subjectMood,
+                activeChapterTitle = chapterTitle,
+                syncedLectureId = lectureId,
+                syncedLectureTitle = lectureTitle,
+                splitRatio = TimerSplitRatio.RATIO_25_75,
+                splitPosture = nextPosture,
+                isFullScreenHomeClockMode = launchFullScreenHomeClock,
+                showStartTagDialog = false,
+                singleTimerLockNotice = null,
+                userStatus = YptMemberStatus.FOCUSING,
+            )
+            syncClockTickFromTimerState(nextTimer)
             state.copy(
-                studyTimerGroupState = t.copy(
-                    isRunning = true,
-                    isPaused = false,
-                    elapsedSeconds = 0,
-                    remainingSeconds = (if (t.pomodoroPhase == PomodoroPhase.FOCUS) t.focusDurationMinutes else t.breakDurationMinutes) * 60,
-                    timerSource = TimerSessionSource.MANUAL,
-                    activeSubjectId = subjectId,
-                    activeSubjectName = subjectName,
-                    activeSubjectMood = subjectMood,
-                    syncedLectureId = lectureId,
-                    syncedLectureTitle = lectureTitle,
-                    // Auto-switch to 25:75 (Timer 25% : Group Study 75%) on timer start!
-                    splitRatio = TimerSplitRatio.RATIO_25_75,
-                    showStartTagDialog = false,
-                    singleTimerLockNotice = null,
-                    userStatus = YptMemberStatus.FOCUSING,
-                ),
+                activeTab = if (launchFullScreenHomeClock) WorkspaceTab.TIMER_GROUP else state.activeTab,
+                isSettingsOpen = if (launchFullScreenHomeClock) false else state.isSettingsOpen,
+                homeClockTagPicker = state.homeClockTagPicker.copy(isOpen = false),
+                studyTimerGroupState = nextTimer,
             )
         }
         launchStudyTimerTicker()
@@ -3546,20 +4232,20 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         val mood = if (source == TimerSessionSource.AUTO_REVISION) AccentMood.EMERALD else AccentMood.AMBER
         studyTimerJob?.cancel()
         _uiState.update { state ->
-            state.copy(
-                studyTimerGroupState = state.studyTimerGroupState.copy(
-                    isRunning = true,
-                    isPaused = false,
-                    elapsedSeconds = 0,
-                    timerSource = source,
-                    activeSubjectId = null,
-                    activeSubjectName = tagName,
-                    activeSubjectMood = mood,
-                    syncedLectureId = null,
-                    syncedLectureTitle = null,
-                    userStatus = YptMemberStatus.IN_REVISION,
-                ),
+            val nextTimer = state.studyTimerGroupState.copy(
+                isRunning = true,
+                isPaused = false,
+                elapsedSeconds = 0,
+                timerSource = source,
+                activeSubjectId = null,
+                activeSubjectName = tagName,
+                activeSubjectMood = mood,
+                syncedLectureId = null,
+                syncedLectureTitle = null,
+                userStatus = YptMemberStatus.IN_REVISION,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
         launchStudyTimerTicker()
     }
@@ -3570,46 +4256,27 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         commitAndClearActiveTimer()
     }
 
+    /**
+     * Zero-Lag 1-second ticker: mutates ONLY the isolated _clockTick StateFlow so
+     * WorkspaceUiState, MainActivity, WorkspaceShell, NavRail, and cards NEVER recompose per second.
+     */
     private fun launchStudyTimerTicker() {
         studyTimerJob?.cancel()
         studyTimerJob = viewModelScope.launch {
             while (true) {
                 delay(1000L)
-                _uiState.update { state ->
-                    val t = state.studyTimerGroupState
-                    if (!t.isRunning) return@update state
-                    val nextElapsed = t.elapsedSeconds + 1
-                    val nextRemaining = if (t.mode == StudyTimerMode.POMODORO && t.timerSource == TimerSessionSource.MANUAL) {
-                        (t.remainingSeconds - 1).coerceAtLeast(0)
+                _clockTick.update { tick ->
+                    if (!tick.isRunning) return@update tick
+                    val nextElapsed = tick.elapsedSeconds + 1
+                    val nextRemaining = if (tick.mode == StudyTimerMode.POMODORO && tick.timerSource == TimerSessionSource.MANUAL) {
+                        (tick.remainingSeconds - 1).coerceAtLeast(0)
                     } else {
-                        t.remainingSeconds
+                        tick.remainingSeconds
                     }
-                    // Also gently tick focusing YPT group peers so group study feels alive
-                    val tickedGroups = t.groups.map { grp ->
-                        if (grp.id != t.joinedGroupId) grp
-                        else grp.copy(
-                            members = grp.members.map { m ->
-                                if (!m.isCurrentUser &&
-                                    (m.status == YptMemberStatus.FOCUSING || m.status == YptMemberStatus.IN_REVISION)
-                                ) {
-                                    m.copy(todayFocusSeconds = m.todayFocusSeconds + 1)
-                                } else m
-                            },
-                        )
-                    }
-                    val updatedLectureTracked = if (t.syncedLectureId != null) {
-                        val cur = t.lectureTrackedSeconds[t.syncedLectureId] ?: 0
-                        t.lectureTrackedSeconds + (t.syncedLectureId to (cur + 1))
-                    } else {
-                        t.lectureTrackedSeconds
-                    }
-                    state.copy(
-                        studyTimerGroupState = t.copy(
-                            elapsedSeconds = nextElapsed,
-                            remainingSeconds = nextRemaining,
-                            groups = tickedGroups,
-                            lectureTrackedSeconds = updatedLectureTracked,
-                        ),
+                    tick.copy(
+                        elapsedSeconds = nextElapsed,
+                        remainingSeconds = nextRemaining,
+                        peerElapsedOffsetSeconds = tick.peerElapsedOffsetSeconds + 1,
                     )
                 }
             }
@@ -3617,17 +4284,20 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun pauseOrResumeStudyTimer() {
+        val liveTick = _clockTick.value
         _uiState.update { state ->
             val t = state.studyTimerGroupState
             if (!t.isTimerActiveSession) return@update state
             val nowRunning = !t.isRunning
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    isRunning = nowRunning,
-                    isPaused = !nowRunning,
-                    userStatus = if (nowRunning) YptMemberStatus.FOCUSING else YptMemberStatus.ON_BREAK,
-                ),
+            val nextTimer = t.copy(
+                isRunning = nowRunning,
+                isPaused = !nowRunning,
+                elapsedSeconds = liveTick.elapsedSeconds,
+                remainingSeconds = liveTick.remainingSeconds,
+                userStatus = if (nowRunning) YptMemberStatus.FOCUSING else YptMemberStatus.ON_BREAK,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
         if (_uiState.value.studyTimerGroupState.isRunning) {
             launchStudyTimerTicker()
@@ -3640,17 +4310,19 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         studyTimerJob?.cancel()
         _uiState.update { state ->
             val t = state.studyTimerGroupState
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    isRunning = false,
-                    isPaused = false,
-                    elapsedSeconds = 0,
-                    remainingSeconds = t.focusDurationMinutes * 60,
-                    pomodoroPhase = PomodoroPhase.FOCUS,
-                    userStatus = YptMemberStatus.IDLE,
-                    singleTimerLockNotice = null,
-                ),
+            val resetRemaining = (t.focusDurationMinutes * 60) + t.customDurationSecondsRemainder
+            val nextTimer = t.copy(
+                isRunning = false,
+                isPaused = false,
+                elapsedSeconds = 0,
+                remainingSeconds = resetRemaining,
+                pomodoroPhase = PomodoroPhase.FOCUS,
+                isFullScreenHomeClockMode = false,
+                userStatus = YptMemberStatus.IDLE,
+                singleTimerLockNotice = null,
             )
+            syncClockTickFromTimerState(nextTimer)
+            state.copy(studyTimerGroupState = nextTimer)
         }
     }
 
@@ -3660,57 +4332,181 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun commitAndClearActiveTimer() {
         studyTimerJob?.cancel()
+        val liveTick = _clockTick.value
         _uiState.update { state ->
             val t = state.studyTimerGroupState
-            val loggedSec = t.elapsedSeconds.coerceAtLeast(1)
+            val loggedSec = liveTick.elapsedSeconds.coerceAtLeast(1)
+            val peerOffset = liveTick.peerElapsedOffsetSeconds.coerceAtLeast(0)
+            val shouldLog = state.settingsPrefs.autoLogStudySessions || t.timerSource != TimerSessionSource.MANUAL
             val tag = t.activeSubjectName ?: "Tagless"
-            val updatedSubjectMap = t.todaySubjectSeconds.toMutableMap().apply {
-                this[tag] = (this[tag] ?: 0) + loggedSec
+
+            val updatedSubjectMap = if (shouldLog) {
+                t.todaySubjectSeconds.toMutableMap().apply {
+                    this[tag] = (this[tag] ?: 0) + loggedSec
+                }
+            } else {
+                t.todaySubjectSeconds
             }
-            val newEntry = StudySessionLogEntry(
-                id = "log_${System.currentTimeMillis()}",
-                subjectName = tag,
-                accentMood = t.activeSubjectMood,
-                syncedLectureId = t.syncedLectureId,
-                syncedLectureTitle = t.syncedLectureTitle,
-                durationSeconds = loggedSec,
-                modeLabel = if (t.timerSource != TimerSessionSource.MANUAL) {
-                    "Auto Count-Up"
-                } else if (t.mode == StudyTimerMode.POMODORO) {
-                    "Pomodoro ${t.focusDurationMinutes}/${t.breakDurationMinutes}"
-                } else {
-                    "Flip Stopwatch"
-                },
-                source = t.timerSource,
-                timestampLabel = "Just now",
-            )
-            // Update today's raw unoptimized daily study point
+
+            val updatedLectureTracked = if (shouldLog && t.syncedLectureId != null) {
+                val cur = t.lectureTrackedSeconds[t.syncedLectureId] ?: 0
+                t.lectureTrackedSeconds + (t.syncedLectureId to (cur + loggedSec))
+            } else {
+                t.lectureTrackedSeconds
+            }
+
+            // Persist accumulated peer focus seconds on session commit and reset leaf offset
+            val updatedGroups = if (peerOffset > 0) {
+                t.groups.map { grp ->
+                    if (grp.id != t.joinedGroupId) grp
+                    else grp.copy(
+                        members = grp.members.map { m ->
+                            if (!m.isCurrentUser &&
+                                (m.status == YptMemberStatus.FOCUSING || m.status == YptMemberStatus.IN_REVISION)
+                            ) {
+                                m.copy(todayFocusSeconds = m.todayFocusSeconds + peerOffset)
+                            } else m
+                        },
+                    )
+                }
+            } else {
+                t.groups
+            }
+
+            val updatedLogs = if (shouldLog) {
+                val newEntry = StudySessionLogEntry(
+                    id = "log_${System.currentTimeMillis()}",
+                    subjectName = tag,
+                    accentMood = t.activeSubjectMood,
+                    syncedLectureId = t.syncedLectureId,
+                    syncedLectureTitle = t.syncedLectureTitle,
+                    durationSeconds = loggedSec,
+                    modeLabel = if (t.timerSource != TimerSessionSource.MANUAL) {
+                        "Auto Count-Up"
+                    } else if (t.mode == StudyTimerMode.POMODORO) {
+                        "Flip Pomodoro ${t.focusDurationMinutes}/${t.breakDurationMinutes}"
+                    } else {
+                        "Flip Stopwatch"
+                    },
+                    source = t.timerSource,
+                    timestampLabel = "Just now",
+                )
+                (listOf(newEntry) + t.recentSessionLogs).take(16)
+            } else {
+                t.recentSessionLogs
+            }
+
             val addedMin = (loggedSec / 60).coerceAtLeast(1)
-            val updatedRawHistory = t.rawDailyStudyHistory.mapIndexed { idx, pt ->
-                if (idx == t.rawDailyStudyHistory.lastIndex) {
-                    pt.copy(totalMinutes = pt.totalMinutes + addedMin)
-                } else pt
+            val updatedRawHistory = if (shouldLog) {
+                t.rawDailyStudyHistory.mapIndexed { idx, pt ->
+                    if (idx == t.rawDailyStudyHistory.lastIndex) {
+                        pt.copy(totalMinutes = pt.totalMinutes + addedMin)
+                    } else pt
+                }
+            } else {
+                t.rawDailyStudyHistory
             }
-            val updatedRag = t.studyLogRag.copy(
-                past20DaysIndividualMinutes = updatedRawHistory,
-                totalLoggedSessions = t.studyLogRag.totalLoggedSessions + 1,
-                compactedSummary = "Logged ${formatDurationCompactHm(loggedSec)} ($tag) · Total today: ${formatDurationCompactHm(updatedSubjectMap.values.sum())}. " +
-                    "Auto-optimized every 3 days (20d individual + 1m avg + 6m avg).",
+
+            val updatedRag = if (shouldLog) {
+                t.studyLogRag.copy(
+                    past20DaysIndividualMinutes = updatedRawHistory,
+                    totalLoggedSessions = t.studyLogRag.totalLoggedSessions + 1,
+                    compactedSummary = "Logged ${formatDurationCompactHm(loggedSec)} ($tag) · Total today: ${formatDurationCompactHm(updatedSubjectMap.values.sum())}. " +
+                        "Auto-optimized every 3 days (20d individual + 1m avg + 6m avg).",
+                )
+            } else {
+                t.studyLogRag
+            }
+
+            val resetRemaining = (t.focusDurationMinutes * 60) + t.customDurationSecondsRemainder
+            val returnToHome = t.isFullScreenHomeClockMode
+            val nextTimer = t.copy(
+                isRunning = false,
+                isPaused = false,
+                elapsedSeconds = 0,
+                remainingSeconds = resetRemaining,
+                completedCycles = if (t.timerSource == TimerSessionSource.MANUAL) t.completedCycles + 1 else t.completedCycles,
+                timerSource = TimerSessionSource.MANUAL,
+                isFullScreenHomeClockMode = false,
+                userStatus = YptMemberStatus.IDLE,
+                singleTimerLockNotice = null,
+                todaySubjectSeconds = updatedSubjectMap,
+                lectureTrackedSeconds = updatedLectureTracked,
+                recentSessionLogs = updatedLogs,
+                rawDailyStudyHistory = updatedRawHistory,
+                studyLogRag = updatedRag,
+                groups = updatedGroups,
             )
+            syncClockTickFromTimerState(nextTimer, resetPeerOffset = true)
+            state.copy(
+                activeTab = if (returnToHome) WorkspaceTab.HOME else state.activeTab,
+                studyTimerGroupState = nextTimer,
+            )
+        }
+    }
+
+    fun setSplitPosture(posture: SplitPosture) {
+        _uiState.update { state ->
+            state.copy(
+                studyTimerGroupState = state.studyTimerGroupState.copy(splitPosture = posture),
+            )
+        }
+    }
+
+    fun toggleSplitView() {
+        _uiState.update { state ->
+            val t = state.studyTimerGroupState
+            val nextPosture = when (t.splitPosture) {
+                SplitPosture.FULL_TIMER -> SplitPosture.BALANCED_SPLIT
+                SplitPosture.FULL_GROUP -> SplitPosture.BALANCED_SPLIT
+                else -> SplitPosture.FULL_TIMER
+            }
+            state.copy(
+                studyTimerGroupState = t.copy(splitPosture = nextPosture),
+            )
+        }
+    }
+
+    fun inspectYptMember(memberId: String?) {
+        _uiState.update { state ->
+            state.copy(
+                studyTimerGroupState = state.studyTimerGroupState.copy(inspectedMemberId = memberId),
+            )
+        }
+    }
+
+    fun sendSilentBoost(memberId: String) {
+        _uiState.update { state ->
+            val t = state.studyTimerGroupState
+            val current = t.silentBoostCounts[memberId] ?: 0
             state.copy(
                 studyTimerGroupState = t.copy(
-                    isRunning = false,
-                    isPaused = false,
-                    elapsedSeconds = 0,
-                    remainingSeconds = t.focusDurationMinutes * 60,
-                    completedCycles = if (t.timerSource == TimerSessionSource.MANUAL) t.completedCycles + 1 else t.completedCycles,
-                    timerSource = TimerSessionSource.MANUAL,
-                    userStatus = YptMemberStatus.IDLE,
-                    singleTimerLockNotice = null,
-                    todaySubjectSeconds = updatedSubjectMap,
-                    recentSessionLogs = (listOf(newEntry) + t.recentSessionLogs).take(16),
-                    rawDailyStudyHistory = updatedRawHistory,
-                    studyLogRag = updatedRag,
+                    silentBoostCounts = t.silentBoostCounts + (memberId to (current + 1)),
+                ),
+            )
+        }
+    }
+
+    fun openAllowedAppsSheet() {
+        _uiState.update { state ->
+            state.copy(studyTimerGroupState = state.studyTimerGroupState.copy(showAllowedAppsSheet = true))
+        }
+    }
+
+    fun closeAllowedAppsSheet() {
+        _uiState.update { state ->
+            state.copy(studyTimerGroupState = state.studyTimerGroupState.copy(showAllowedAppsSheet = false))
+        }
+    }
+
+    fun toggleAllowedApp(appId: String) {
+        _uiState.update { state ->
+            val t = state.studyTimerGroupState
+            state.copy(
+                studyTimerGroupState = t.copy(
+                    allowedApps = t.allowedApps.map { app ->
+                        if (app.id == appId) app.copy(isAllowed = !app.isAllowed) else app
+                    },
                 ),
             )
         }
@@ -3724,24 +4520,9 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** Jumps cleanly from 100:0 or 0:100 to 75:25 / 25:75 (or toggles back). */
+    /** Legacy toggle kept for compatibility; routes cleanly to SplitPosture too. */
     fun toggleGroupStudySplit() {
-        _uiState.update { state ->
-            val t = state.studyTimerGroupState
-            val next = when (t.splitRatio) {
-                TimerSplitRatio.RATIO_100_0 -> TimerSplitRatio.RATIO_75_25
-                TimerSplitRatio.RATIO_0_100 -> TimerSplitRatio.RATIO_25_75
-                TimerSplitRatio.RATIO_75_25 -> TimerSplitRatio.RATIO_100_0
-                TimerSplitRatio.RATIO_50_50 -> TimerSplitRatio.RATIO_25_75
-                TimerSplitRatio.RATIO_25_75 -> TimerSplitRatio.RATIO_100_0
-            }
-            state.copy(
-                studyTimerGroupState = t.copy(
-                    splitRatio = next,
-                    lastSplitRatioBeforeToggle = t.splitRatio,
-                ),
-            )
-        }
+        toggleSplitView()
     }
 
     fun openTimerStatsSheet() {
@@ -3926,13 +4707,27 @@ class WorkspaceViewModel(application: Application) : AndroidViewModel(applicatio
                 return@update state.copy(activeTab = WorkspaceTab.TIMER_GROUP)
             }
             when {
+                state.settingsPrefs.showResetDemoConfirmDialog ->
+                    state.copy(settingsPrefs = state.settingsPrefs.copy(showResetDemoConfirmDialog = false))
                 state.isSettingsOpen ->
                     state.copy(isSettingsOpen = false)
+                state.homeClockTagPicker.isOpen ->
+                    state.copy(homeClockTagPicker = state.homeClockTagPicker.copy(isOpen = false))
                 state.homeCommandState.activeDailyPage != null ->
                     state.copy(homeCommandState = state.homeCommandState.copy(activeDailyPage = null, isActiveFlashcardFlipped = false))
                 state.inspectSelection != null -> state.copy(inspectSelection = null)
+                state.activeTab == WorkspaceTab.DAILY_PLANNER && state.standalonePlannerState.activeAppeal != null ->
+                    state.copy(standalonePlannerState = state.standalonePlannerState.copy(activeAppeal = null))
+                state.activeTab == WorkspaceTab.DAILY_PLANNER && state.standalonePlannerState.showSimulatedRagSheet ->
+                    state.copy(standalonePlannerState = state.standalonePlannerState.copy(showSimulatedRagSheet = false))
+                state.activeTab == WorkspaceTab.DAILY_PLANNER && state.standalonePlannerState.isAiSidePanelOpen ->
+                    state.copy(standalonePlannerState = state.standalonePlannerState.copy(isAiSidePanelOpen = false))
                 state.activeTab == WorkspaceTab.DAILY_PLANNER && state.standalonePlannerState.pendingGate != null ->
                     state.copy(standalonePlannerState = state.standalonePlannerState.copy(pendingGate = null))
+                state.activeTab == WorkspaceTab.TIMER_GROUP && state.studyTimerGroupState.showAllowedAppsSheet ->
+                    state.copy(studyTimerGroupState = state.studyTimerGroupState.copy(showAllowedAppsSheet = false))
+                state.activeTab == WorkspaceTab.TIMER_GROUP && state.studyTimerGroupState.inspectedMemberId != null ->
+                    state.copy(studyTimerGroupState = state.studyTimerGroupState.copy(inspectedMemberId = null))
                 state.activeTab == WorkspaceTab.TIMER_GROUP && state.studyTimerGroupState.showStatsSheet ->
                     state.copy(studyTimerGroupState = state.studyTimerGroupState.copy(showStatsSheet = false))
                 state.activeTab == WorkspaceTab.TIMER_GROUP && state.studyTimerGroupState.showStartTagDialog ->

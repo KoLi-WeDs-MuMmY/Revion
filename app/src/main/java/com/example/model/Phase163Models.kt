@@ -95,12 +95,29 @@ data class StandalonePlannerUiState(
     val tasks: List<StandalonePlannerTask>,
     val pendingGate: PlannerAiGateRequest? = null,
     val statusNotice: String? = null,
+    // Phase 1.6.4 Materialized Planner, 2-option AI Drawer, Heatmap, Appeal & 3-Edit Tasks
+    val isAiSidePanelOpen: Boolean = false,
+    val showSimulatedRagSheet: Boolean = false,
+    val heatmapDays: List<PlannerHeatmapDay> = emptyList(),
+    val activeAppeal: PlannerAppealRequest? = null,
+    val userTasks: List<PlannerUserTask> = emptyList(),
+    val manualEditsUsed: Int = 0,
+    val manualEditCap: Int = 3,
+    val isManualTaskEditingLocked: Boolean = false,
+    val aiInterventionBanner: String? = null,
+    val aiSideMessages: List<PlannerAiSideMessage> = emptyList(),
+    val aiSideComposerText: String = "",
 ) {
     val liveTaskCompletionPercent: Int
         get() {
-            if (tasks.isEmpty()) return 0
-            return (tasks.count { it.isCompleted } * 100) / tasks.size
+            val total = tasks.size + userTasks.size
+            if (total == 0) return 0
+            val done = tasks.count { it.isCompleted } + userTasks.count { it.isCompleted }
+            return (done * 100) / total
         }
+
+    val manualEditsRemaining: Int
+        get() = (manualEditCap - manualEditsUsed).coerceAtLeast(0)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -251,6 +268,16 @@ data class StudyTimerGroupUiState(
     val joinedGroupId: String = "",
     val userStatus: YptMemberStatus = YptMemberStatus.IDLE,
     val userChapterTag: String = "Gauss's Law & Flux",
+    // Phase 1.6.4 Zero-Ratio Split Posture, Full-Screen Home Clock & Authentic YPT Fields
+    val splitPosture: SplitPosture = SplitPosture.FULL_TIMER,
+    val isFullScreenHomeClockMode: Boolean = false,
+    val activeBatchName: String? = null,
+    val activeChapterTitle: String? = null,
+    val customDurationSecondsRemainder: Int = 0,
+    val allowedApps: List<YptAllowedApp> = emptyList(),
+    val showAllowedAppsSheet: Boolean = false,
+    val inspectedMemberId: String? = null,
+    val silentBoostCounts: Map<String, Int> = emptyMap(),
 ) {
     val isTimerActiveSession: Boolean
         get() = isRunning || isPaused

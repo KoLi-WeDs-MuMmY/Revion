@@ -1,6 +1,8 @@
 package com.example.ui.timer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.FolderCopy
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Link
@@ -36,8 +41,10 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.ViewSidebar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -53,7 +60,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -63,11 +69,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.ClockThemeId
+import com.example.model.LiveClockTick
+import com.example.model.MotionIntensity
 import com.example.model.PomodoroPhase
-import com.example.model.PomodoroRingStyle
+import com.example.model.SplitPosture
 import com.example.model.StudyTimerGroupUiState
 import com.example.model.StudyTimerMode
-import com.example.model.TimerSplitRatio
 import com.example.model.VaultSubjectNode
 import com.example.model.YptMemberStatus
 import com.example.model.formatDurationCompactHm
@@ -78,27 +86,28 @@ import com.example.ui.groupstudy.YptGroupStudyPane
 import com.example.ui.theme.AccentMood
 import com.example.ui.theme.GhickinTokens
 import com.example.ui.theme.MicroTagMono
+import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Full-Screen Distraction-Free Synced Study Timer & YPT Group Study Workspace:
- * - Opens with all app navigation collapsed.
- * - Supports hold-and-drag 5-ratio split screen: 100:0, 75:25, 50:50, 25:75, 0:100.
- * - Auto-switches to 25:75 (Timer:Group) on timer start.
- * - Shows floating live clock in upper-left corner when in 0:100 pure Group Study.
- * - In high timer view (75:25 or 100:0), displays Subjects & today's study time on the right
- *   (stacked below on narrow portrait) with direct click-to-start.
- * - Enforces single-timer lock & Vault-only access while a timer is running.
+ * Full-Screen Distraction-Free 3D Flip-Clock Timer & Authentic YPT Group Study Workspace:
+ * - Zero ratio numbers anywhere in the UI.
+ * - Single Split-Screen toggle + smooth spring-snapping vertical/horizontal drag divider.
+ * - Isolated 1-second leaf clockTickFlow updates (parent layout never recomposes per tick).
+ * - Strict maxLines = 1, softWrap = false guards so narrow panes never wrap letters vertically.
  */
 @Composable
 fun StudyTimerAndGroupScreen(
     state: StudyTimerGroupUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    clockTheme: ClockThemeId,
+    motionIntensity: MotionIntensity,
     subjects: List<VaultSubjectNode>,
     isWideLayout: Boolean,
     onExitToHome: () -> Unit,
     onOpenVaultWhileTimerActive: () -> Unit,
     onSelectMode: (StudyTimerMode) -> Unit,
-    onSelectPomodoroStyle: (PomodoroRingStyle) -> Unit,
     onApplyPomodoroPreset: (focusMin: Int, breakMin: Int) -> Unit,
+    onAdjustCustomTimerSeconds: (deltaSeconds: Int) -> Unit,
     onSwitchPomodoroPhase: () -> Unit,
     onAddFiveMinutes: () -> Unit,
     onRequestStartFromMainButton: () -> Unit,
@@ -115,8 +124,8 @@ fun StudyTimerAndGroupScreen(
     onPauseResumeTimer: () -> Unit,
     onResetTimer: () -> Unit,
     onStopAndLogTimer: () -> Unit,
-    onSetSplitRatio: (TimerSplitRatio) -> Unit,
-    onToggleGroupStudySplit: () -> Unit,
+    onSetSplitPosture: (SplitPosture) -> Unit,
+    onToggleSplitView: () -> Unit,
     onOpenStatsSheet: () -> Unit,
     onCloseStatsSheet: () -> Unit,
     onJoinGroup: (String) -> Unit,
@@ -124,12 +133,16 @@ fun StudyTimerAndGroupScreen(
     onCloseCreateGroupDialog: () -> Unit,
     onCreatePublicGroup: (name: String, category: String, targetHours: Int) -> Unit,
     onSelectUserStatus: (YptMemberStatus) -> Unit,
+    onInspectYptMember: (String?) -> Unit,
+    onSendSilentBoost: (String) -> Unit,
+    onOpenAllowedAppsSheet: () -> Unit,
+    onCloseAllowedAppsSheet: () -> Unit,
+    onToggleAllowedApp: (String) -> Unit,
     onDismissLockNotice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
 
-    // While a manual timer is active, Back goes to Vault-only or shows lock notice rather than unlocking all tabs
     BackHandler {
         if (state.isManualTimerLocked) {
             onOpenVaultWhileTimerActive()
@@ -144,288 +157,221 @@ fun StudyTimerAndGroupScreen(
             .background(tokens.amoledBackground)
             .testTag("study_timer_group_fullscreen"),
     ) {
-        // Compact Full-Screen Top Bar
-        TimerFullScreenTopBar(
+        // 1. Clean Top Bar (Zero ratio numbers — Single Split-Screen toggle + Stats + Vault)
+        TimerWorkspaceTopBar(
             state = state,
             isWideLayout = isWideLayout,
             onExitToHome = onExitToHome,
             onOpenVault = onOpenVaultWhileTimerActive,
-            onSelectMode = onSelectMode,
-            onToggleGroupSplit = onToggleGroupStudySplit,
-            onOpenStats = onOpenStatsSheet,
+            onToggleSplitView = onToggleSplitView,
+            onOpenStatsSheet = onOpenStatsSheet,
         )
 
-        // Single-Timer Lock Warning Banner (if user attempted starting a 2nd timer)
-        if (state.singleTimerLockNotice != null) {
-            Surface(
-                color = AccentMood.AMBER.accent.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, AccentMood.AMBER.accent.copy(alpha = 0.45f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .testTag("single_timer_lock_banner"),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Single-Timer Lock Notice Banner
+        AnimatedVisibility(visible = state.singleTimerLockNotice != null) {
+            state.singleTimerLockNotice?.let { notice ->
+                Surface(
+                    color = AccentMood.AMBER.accent.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, AccentMood.AMBER.accent.copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Lock,
-                        contentDescription = null,
-                        tint = AccentMood.AMBER.accent,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = state.singleTimerLockNotice,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = tokens.inkPrimary,
-                        modifier = Modifier.weight(1f),
-                    )
-                    val dismissInt = remember { MutableInteractionSource() }
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Dismiss lock warning",
-                        tint = tokens.inkMuted,
+                    Row(
                         modifier = Modifier
-                            .size(20.dp)
-                            .clickable(
-                                interactionSource = dismissInt,
-                                indication = null,
-                                onClick = onDismissLockNotice,
-                            ),
-                    )
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = AccentMood.AMBER.accent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = notice,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = tokens.inkPrimary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .clickable(onClick = onDismissLockNotice),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Dismiss notice",
+                                tint = tokens.inkMuted,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // Main Interactive 5-Ratio Draggable Split Stage
+        // 2. Main Smooth Split-Screen Stage with Tactile Drag Handle
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxSize(),
+                .fillMaxWidth(),
         ) {
             val density = LocalDensity.current
-            val totalAxisPx = remember(maxWidth, maxHeight, isWideLayout, density) {
-                with(density) { (if (isWideLayout) maxWidth else maxHeight).toPx() }.coerceAtLeast(1f)
-            }
+            val totalAxisPx = with(density) {
+                if (isWideLayout) maxWidth.toPx() else maxHeight.toPx()
+            }.coerceAtLeast(1f)
+
             var isDragging by remember { mutableStateOf(false) }
-            var liveFraction by remember(state.splitRatio) { mutableFloatStateOf(state.splitRatio.timerFraction) }
+            var dragFraction by remember(state.splitPosture) {
+                mutableFloatStateOf(state.splitPosture.timerFraction)
+            }
 
-            val activeFraction = if (isDragging) liveFraction else state.splitRatio.timerFraction
-            val timerFrac = activeFraction.coerceIn(0f, 1f)
-            val groupFrac = (1f - timerFrac).coerceIn(0f, 1f)
+            val targetFraction = if (isDragging) dragFraction else state.splitPosture.timerFraction
+            val animatedFraction by animateFloatAsState(
+                targetValue = targetFraction.coerceIn(0f, 1f),
+                animationSpec = motionIntensity.springSpec(),
+                label = "timerGroupSplitFraction",
+            )
 
-            val showTimerPane = timerFrac > 0.05f
-            val showGroupPane = groupFrac > 0.05f
+            val showTimerPane = animatedFraction > 0.04f
+            val showGroupPane = animatedFraction < 0.96f
+            val showDragHandle = showTimerPane && showGroupPane
+
+            val timerContent: @Composable (Modifier) -> Unit = { paneMod ->
+                FlipClockTimerPane(
+                    state = state,
+                    clockTickFlow = clockTickFlow,
+                    clockTheme = clockTheme,
+                    motionIntensity = motionIntensity,
+                    subjects = subjects,
+                    onSelectMode = onSelectMode,
+                    onApplyPomodoroPreset = onApplyPomodoroPreset,
+                    onAdjustCustomTimerSeconds = onAdjustCustomTimerSeconds,
+                    onSwitchPomodoroPhase = onSwitchPomodoroPhase,
+                    onAddFiveMinutes = onAddFiveMinutes,
+                    onRequestStartFromMainButton = onRequestStartFromMainButton,
+                    onQuickStartSubject = onQuickStartSubject,
+                    onPauseResumeTimer = onPauseResumeTimer,
+                    onResetTimer = onResetTimer,
+                    onStopAndLogTimer = onStopAndLogTimer,
+                    modifier = paneMod,
+                )
+            }
+
+            val groupContent: @Composable (Modifier) -> Unit = { paneMod ->
+                Box(modifier = paneMod) {
+                    YptGroupStudyPane(
+                        state = state,
+                        clockTickFlow = clockTickFlow,
+                        onJoinGroup = onJoinGroup,
+                        onOpenCreateGroupDialog = onOpenCreateGroupDialog,
+                        onSelectUserStatus = onSelectUserStatus,
+                        onInspectMember = onInspectYptMember,
+                        onSendSilentBoost = onSendSilentBoost,
+                        onOpenAllowedAppsSheet = onOpenAllowedAppsSheet,
+                        onCloseAllowedAppsSheet = onCloseAllowedAppsSheet,
+                        onToggleAllowedApp = onToggleAllowedApp,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                    // Floating compact live clock chip when in Full Group view
+                    if (!showTimerPane) {
+                        FloatingGroupLiveClockChip(
+                            state = state,
+                            clockTickFlow = clockTickFlow,
+                            clockTheme = clockTheme,
+                            onRestoreSplit = { onSetSplitPosture(SplitPosture.BALANCED_SPLIT) },
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(start = 12.dp, top = 12.dp),
+                        )
+                    }
+                }
+            }
 
             if (isWideLayout) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (showTimerPane) {
-                        TimerPrimaryPane(
-                            state = state,
-                            subjects = subjects,
-                            isWideLayout = true,
-                            isCompactPane = timerFrac <= 0.35f,
-                            showSubjectsPanel = state.splitRatio.isHighTimerView && !isDragging,
-                            onSelectPomodoroStyle = onSelectPomodoroStyle,
-                            onApplyPomodoroPreset = onApplyPomodoroPreset,
-                            onSwitchPomodoroPhase = onSwitchPomodoroPhase,
-                            onAddFiveMinutes = onAddFiveMinutes,
-                            onRequestStartFromMainButton = onRequestStartFromMainButton,
-                            onQuickStartSubject = onQuickStartSubject,
-                            onPauseResumeTimer = onPauseResumeTimer,
-                            onResetTimer = onResetTimer,
-                            onStopAndLogTimer = onStopAndLogTimer,
-                            modifier = Modifier
-                                .weight(timerFrac)
+                        timerContent(
+                            Modifier
+                                .weight(animatedFraction.coerceAtLeast(0.01f))
                                 .fillMaxHeight(),
                         )
                     }
 
-                    // Draggable Center Handle (always accessible to drag between 100:0 .. 0:100)
-                    SplitDragHandle(
-                        isHorizontalSplit = true,
-                        currentRatioLabel = TimerSplitRatio.nearestTo(timerFrac).label,
-                        isDragging = isDragging,
-                        onDragStart = {
-                            isDragging = true
-                            liveFraction = state.splitRatio.timerFraction
-                        },
-                        onDragDelta = { deltaPx ->
-                            liveFraction = (liveFraction + (deltaPx / totalAxisPx)).coerceIn(0f, 1f)
-                        },
-                        onDragEnd = {
-                            val snapped = TimerSplitRatio.nearestTo(liveFraction)
-                            isDragging = false
-                            liveFraction = snapped.timerFraction
-                            onSetSplitRatio(snapped)
-                        },
-                        onCycleSnap = {
-                            val entries = TimerSplitRatio.entries
-                            val nextIdx = (entries.indexOf(state.splitRatio) + 1) % entries.size
-                            onSetSplitRatio(entries[nextIdx])
-                        },
-                    )
+                    if (showDragHandle) {
+                        TactileSplitHandle(
+                            isVerticalDivider = true,
+                            isDragging = isDragging,
+                            onDragStart = {
+                                isDragging = true
+                                dragFraction = state.splitPosture.timerFraction
+                            },
+                            onDragDeltaPx = { delta ->
+                                dragFraction = (dragFraction + delta / totalAxisPx).coerceIn(0f, 1f)
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                onSetSplitPosture(SplitPosture.nearestTo(dragFraction))
+                            },
+                        )
+                    }
 
                     if (showGroupPane) {
-                        YptGroupStudyPane(
-                            state = state,
-                            isPureGroupScreen = state.splitRatio == TimerSplitRatio.RATIO_0_100,
-                            isCompactWidth = groupFrac <= 0.35f,
-                            onJoinGroup = onJoinGroup,
-                            onOpenCreateGroupDialog = onOpenCreateGroupDialog,
-                            onSelectUserStatus = onSelectUserStatus,
-                            modifier = Modifier
-                                .weight(groupFrac)
+                        groupContent(
+                            Modifier
+                                .weight((1f - animatedFraction).coerceAtLeast(0.01f))
                                 .fillMaxHeight(),
                         )
                     }
                 }
             } else {
-                // 9:16 Portrait: Vertical Draggable Split
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (showTimerPane) {
-                        TimerPrimaryPane(
-                            state = state,
-                            subjects = subjects,
-                            isWideLayout = false,
-                            isCompactPane = timerFrac <= 0.35f,
-                            showSubjectsPanel = state.splitRatio.isHighTimerView && !isDragging,
-                            onSelectPomodoroStyle = onSelectPomodoroStyle,
-                            onApplyPomodoroPreset = onApplyPomodoroPreset,
-                            onSwitchPomodoroPhase = onSwitchPomodoroPhase,
-                            onAddFiveMinutes = onAddFiveMinutes,
-                            onRequestStartFromMainButton = onRequestStartFromMainButton,
-                            onQuickStartSubject = onQuickStartSubject,
-                            onPauseResumeTimer = onPauseResumeTimer,
-                            onResetTimer = onResetTimer,
-                            onStopAndLogTimer = onStopAndLogTimer,
-                            modifier = Modifier
-                                .weight(timerFrac)
+                        timerContent(
+                            Modifier
+                                .weight(animatedFraction.coerceAtLeast(0.01f))
                                 .fillMaxWidth(),
                         )
                     }
 
-                    SplitDragHandle(
-                        isHorizontalSplit = false,
-                        currentRatioLabel = TimerSplitRatio.nearestTo(timerFrac).label,
-                        isDragging = isDragging,
-                        onDragStart = {
-                            isDragging = true
-                            liveFraction = state.splitRatio.timerFraction
-                        },
-                        onDragDelta = { deltaPx ->
-                            liveFraction = (liveFraction + (deltaPx / totalAxisPx)).coerceIn(0f, 1f)
-                        },
-                        onDragEnd = {
-                            val snapped = TimerSplitRatio.nearestTo(liveFraction)
-                            isDragging = false
-                            liveFraction = snapped.timerFraction
-                            onSetSplitRatio(snapped)
-                        },
-                        onCycleSnap = {
-                            val entries = TimerSplitRatio.entries
-                            val nextIdx = (entries.indexOf(state.splitRatio) + 1) % entries.size
-                            onSetSplitRatio(entries[nextIdx])
-                        },
-                    )
+                    if (showDragHandle) {
+                        TactileSplitHandle(
+                            isVerticalDivider = false,
+                            isDragging = isDragging,
+                            onDragStart = {
+                                isDragging = true
+                                dragFraction = state.splitPosture.timerFraction
+                            },
+                            onDragDeltaPx = { delta ->
+                                dragFraction = (dragFraction + delta / totalAxisPx).coerceIn(0f, 1f)
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                onSetSplitPosture(SplitPosture.nearestTo(dragFraction))
+                            },
+                        )
+                    }
 
                     if (showGroupPane) {
-                        YptGroupStudyPane(
-                            state = state,
-                            isPureGroupScreen = state.splitRatio == TimerSplitRatio.RATIO_0_100,
-                            isCompactWidth = true,
-                            onJoinGroup = onJoinGroup,
-                            onOpenCreateGroupDialog = onOpenCreateGroupDialog,
-                            onSelectUserStatus = onSelectUserStatus,
-                            modifier = Modifier
-                                .weight(groupFrac)
+                        groupContent(
+                            Modifier
+                                .weight((1f - animatedFraction).coerceAtLeast(0.01f))
                                 .fillMaxWidth(),
                         )
                     }
-                }
-            }
-
-            // Floating Live Ticking Mini Clock in UPPER-LEFT corner when in Pure Group Study (0:100)
-            if (state.splitRatio == TimerSplitRatio.RATIO_0_100 && state.isTimerActiveSession) {
-                val pillInt = remember { MutableInteractionSource() }
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = tokens.obsidianSurface.copy(alpha = 0.96f),
-                    border = BorderStroke(1.dp, tokens.semanticSuccess.copy(alpha = 0.65f)),
-                    shadowElevation = 6.dp,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 12.dp, top = 8.dp)
-                        .testTag("pure_group_floating_upper_left_clock")
-                        .tactileScale(pillInt, 0.95f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = pillInt,
-                            indication = ripple(),
-                            role = Role.Button,
-                            onClick = { onSetSplitRatio(TimerSplitRatio.RATIO_25_75) },
-                        ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (state.isRunning) tokens.semanticSuccess else AccentMood.AMBER.accent),
-                        )
-                        Text(
-                            text = formatDurationHms(state.displaySeconds),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontFeatureSettings = "tnum",
-                            ),
-                            color = tokens.inkPrimary,
-                        )
-                        Text(
-                            text = state.activeSubjectName ?: "Tagless",
-                            style = MicroTagMono,
-                            color = tokens.themeAccent,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-
-            // Live Drag Snap Indicator Overlay
-            if (isDragging) {
-                Surface(
-                    shape = RoundedCornerShape(100.dp),
-                    color = tokens.primaryCta,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(8.dp),
-                ) {
-                    Text(
-                        text = "SNAP ${TimerSplitRatio.nearestTo(liveFraction).label}",
-                        style = MicroTagMono,
-                        color = tokens.onPrimaryCta,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    )
                 }
             }
         }
-
-        // Quick 5-Ratio Preset Bar at bottom edge (complements Hold & Drag for instant precision)
-        SplitRatioQuickStrip(
-            activeRatio = state.splitRatio,
-            onSelectRatio = onSetSplitRatio,
-        )
     }
 
-    // Popups & Sheets
+    // Main Start Subject Tag + Optional Lecture Sync Modal
     if (state.showStartTagDialog) {
         TimerStartTagDialog(
             subjects = subjects,
@@ -435,6 +381,7 @@ fun StudyTimerAndGroupScreen(
         )
     }
 
+    // Stats, Unoptimized Daily Graph & Group Leaderboard Modal
     if (state.showStatsSheet) {
         TimerStatsAndLeaderboardSheet(
             state = state,
@@ -442,29 +389,26 @@ fun StudyTimerAndGroupScreen(
         )
     }
 
+    // Create Public YPT Study Group Modal
     if (state.showCreateGroupDialog) {
         CreateYptGroupDialog(
-            onCreateGroup = onCreatePublicGroup,
+            onCreate = onCreatePublicGroup,
             onDismiss = onCloseCreateGroupDialog,
         )
     }
 }
 
 @Composable
-private fun TimerFullScreenTopBar(
+private fun TimerWorkspaceTopBar(
     state: StudyTimerGroupUiState,
     isWideLayout: Boolean,
     onExitToHome: () -> Unit,
     onOpenVault: () -> Unit,
-    onSelectMode: (StudyTimerMode) -> Unit,
-    onToggleGroupSplit: () -> Unit,
-    onOpenStats: () -> Unit,
+    onToggleSplitView: () -> Unit,
+    onOpenStatsSheet: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
-    val backInt = remember { MutableInteractionSource() }
-    val vaultInt = remember { MutableInteractionSource() }
-    val groupToggleInt = remember { MutableInteractionSource() }
-    val statsInt = remember { MutableInteractionSource() }
+    val splitActive = state.splitPosture != SplitPosture.FULL_TIMER
 
     Surface(
         color = tokens.obsidianSurface,
@@ -478,172 +422,128 @@ private fun TimerFullScreenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (!state.isManualTimerLocked) {
-                Surface(
-                    shape = RoundedCornerShape(11.dp),
-                    color = tokens.carbonSurface,
-                    border = BorderStroke(1.dp, tokens.hairlineRest),
-                    modifier = Modifier
-                        .testTag("timer_exit_home_button")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(backInt, 0.94f)
-                        .clip(RoundedCornerShape(11.dp))
-                        .clickable(
-                            interactionSource = backInt,
-                            indication = ripple(),
-                            role = Role.Button,
-                            onClick = onExitToHome,
-                        ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Exit full-screen timer",
-                            tint = tokens.inkPrimary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        if (isWideLayout) {
-                            Text(
-                                text = "Exit",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = tokens.inkPrimary,
-                            )
-                        }
-                    }
-                }
-            } else {
-                // While timer is active: Vault-Only Access!
-                Surface(
-                    shape = RoundedCornerShape(11.dp),
-                    color = tokens.themeAccent.copy(alpha = 0.16f),
-                    border = BorderStroke(1.dp, tokens.themeAccent.copy(alpha = 0.55f)),
-                    modifier = Modifier
-                        .testTag("timer_active_open_vault_button")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(vaultInt, 0.95f)
-                        .clip(RoundedCornerShape(11.dp))
-                        .clickable(
-                            interactionSource = vaultInt,
-                            indication = ripple(),
-                            role = Role.Button,
-                            onClick = onOpenVault,
-                        ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.FolderCopy,
-                            contentDescription = "Open Vault while timer runs",
-                            tint = tokens.themeAccent,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            text = if (isWideLayout) "Vault Only" else "Vault",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = tokens.themeAccent,
-                        )
-                    }
-                }
-            }
-
-            // Pomodoro | Stopwatch Mode Selector
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(tokens.carbonSurface)
-                    .padding(3.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                StudyTimerMode.entries.forEach { m ->
-                    val active = state.mode == m
-                    val mInt = remember { MutableInteractionSource() }
-                    Box(
-                        modifier = Modifier
-                            .testTag("timer_mode_${m.name.lowercase()}")
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (active) tokens.primaryCta else Color.Transparent)
-                            .clickable(
-                                interactionSource = mInt,
-                                indication = ripple(),
-                                role = Role.Tab,
-                                onClick = { onSelectMode(m) },
-                            )
-                            .padding(horizontal = if (isWideLayout) 12.dp else 9.dp, vertical = 7.dp),
-                    ) {
-                        Text(
-                            text = m.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (active) tokens.onPrimaryCta else tokens.inkSecondary,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Group Study Split Toggle (100:0/0:100 <-> 75:25/25:75)
-            val isGroupVisible = state.splitRatio != TimerSplitRatio.RATIO_100_0
+            // Back / Vault button
             Surface(
-                shape = RoundedCornerShape(11.dp),
-                color = if (isGroupVisible) tokens.themeAccent.copy(alpha = 0.16f) else tokens.carbonSurface,
-                border = BorderStroke(1.dp, if (isGroupVisible) tokens.themeAccent else tokens.hairlineRest),
+                shape = RoundedCornerShape(10.dp),
+                color = tokens.carbonSurface,
+                border = BorderStroke(1.dp, tokens.hairlineRest),
                 modifier = Modifier
-                    .testTag("timer_group_split_toggle")
+                    .clip(RoundedCornerShape(10.dp))
                     .minimumInteractiveComponentSize()
-                    .tactileScale(groupToggleInt, 0.95f)
-                    .clip(RoundedCornerShape(11.dp))
                     .clickable(
-                        interactionSource = groupToggleInt,
-                        indication = ripple(),
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = tokens.inkPrimary),
                         role = Role.Button,
-                        onClick = onToggleGroupSplit,
-                    ),
+                        onClick = {
+                            if (state.isManualTimerLocked) onOpenVault() else onExitToHome()
+                        },
+                    )
+                    .testTag("timer_top_exit_or_vault_button"),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Groups,
-                        contentDescription = "Toggle Group Study split",
-                        tint = if (isGroupVisible) tokens.themeAccent else tokens.inkSecondary,
-                        modifier = Modifier.size(17.dp),
+                        imageVector = if (state.isManualTimerLocked) Icons.Rounded.FolderCopy else Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = if (state.isManualTimerLocked) "Open Vault" else "Back to Home",
+                        tint = tokens.inkPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = if (state.isManualTimerLocked) "Vault" else "Home",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = tokens.inkPrimary,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            // Title & Active Tag
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (state.isFullScreenHomeClockMode) "Focus Desk Clock" else "Study Timer & Group",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = tokens.inkPrimary,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val tagSubtitle = buildString {
+                    append(state.activeSubjectName ?: "Untagged")
+                    state.syncedLectureTitle?.let { append(" · $it") }
+                }
+                Text(
+                    text = tagSubtitle,
+                    style = MicroTagMono,
+                    color = if (state.isTimerActiveSession) state.activeSubjectMood.accent else tokens.inkMuted,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // Single Clean Split-Screen Toggle (Zero Ratio Numbers!)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = if (splitActive) tokens.primaryCta else tokens.carbonSurface,
+                border = BorderStroke(
+                    1.dp,
+                    if (splitActive) tokens.primaryCta else tokens.hairlineRest,
+                ),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .minimumInteractiveComponentSize()
+                    .tactileScale()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = tokens.inkPrimary),
+                        role = Role.Button,
+                        onClick = onToggleSplitView,
+                    )
+                    .testTag("timer_single_split_toggle"),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = if (splitActive) Icons.Rounded.ViewSidebar else Icons.Rounded.Groups,
+                        contentDescription = "Toggle Split Screen with YPT Group Study",
+                        tint = if (splitActive) tokens.onPrimaryCta else tokens.inkPrimary,
+                        modifier = Modifier.size(16.dp),
                     )
                     if (isWideLayout) {
                         Text(
-                            text = "Group (${state.splitRatio.label})",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isGroupVisible) tokens.themeAccent else tokens.inkPrimary,
+                            text = if (splitActive) "Split On" else "Group Split",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (splitActive) tokens.onPrimaryCta else tokens.inkPrimary,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
             }
 
-            // Stats & Leaderboard Button
+            // Stats & Leaderboard Sheet Button
             Surface(
-                shape = RoundedCornerShape(11.dp),
+                shape = RoundedCornerShape(10.dp),
                 color = tokens.carbonSurface,
                 border = BorderStroke(1.dp, tokens.hairlineRest),
                 modifier = Modifier
-                    .testTag("timer_open_stats_button")
+                    .clip(RoundedCornerShape(10.dp))
                     .minimumInteractiveComponentSize()
-                    .tactileScale(statsInt, 0.95f)
-                    .clip(RoundedCornerShape(11.dp))
                     .clickable(
-                        interactionSource = statsInt,
-                        indication = ripple(),
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = tokens.inkPrimary),
                         role = Role.Button,
-                        onClick = onOpenStats,
-                    ),
+                        onClick = onOpenStatsSheet,
+                    )
+                    .testTag("timer_open_stats_button"),
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -652,15 +552,17 @@ private fun TimerFullScreenTopBar(
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.BarChart,
-                        contentDescription = "Open timer stats and leaderboard",
+                        contentDescription = "Study Stats & Leaderboard",
                         tint = tokens.inkPrimary,
-                        modifier = Modifier.size(17.dp),
+                        modifier = Modifier.size(16.dp),
                     )
                     if (isWideLayout) {
                         Text(
                             text = "Stats",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = tokens.inkPrimary,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
@@ -670,14 +572,15 @@ private fun TimerFullScreenTopBar(
 }
 
 @Composable
-private fun TimerPrimaryPane(
+private fun FlipClockTimerPane(
     state: StudyTimerGroupUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    clockTheme: ClockThemeId,
+    motionIntensity: MotionIntensity,
     subjects: List<VaultSubjectNode>,
-    isWideLayout: Boolean,
-    isCompactPane: Boolean,
-    showSubjectsPanel: Boolean,
-    onSelectPomodoroStyle: (PomodoroRingStyle) -> Unit,
+    onSelectMode: (StudyTimerMode) -> Unit,
     onApplyPomodoroPreset: (Int, Int) -> Unit,
+    onAdjustCustomTimerSeconds: (Int) -> Unit,
     onSwitchPomodoroPhase: () -> Unit,
     onAddFiveMinutes: () -> Unit,
     onRequestStartFromMainButton: () -> Unit,
@@ -688,535 +591,465 @@ private fun TimerPrimaryPane(
     modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val activeAccent = if (state.activeSubjectName != null) state.activeSubjectMood.accent else tokens.themeAccent
 
-    if (showSubjectsPanel && isWideLayout) {
-        // High Timer % in 16:9 Landscape: Timer UI on left + Subjects Today panel on right
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            TimerInstrumentColumn(
-                state = state,
-                activeAccent = activeAccent,
-                compact = false,
-                onSelectPomodoroStyle = onSelectPomodoroStyle,
-                onApplyPomodoroPreset = onApplyPomodoroPreset,
-                onSwitchPomodoroPhase = onSwitchPomodoroPhase,
-                onAddFiveMinutes = onAddFiveMinutes,
-                onRequestStartFromMainButton = onRequestStartFromMainButton,
-                onPauseResumeTimer = onPauseResumeTimer,
-                onResetTimer = onResetTimer,
-                onStopAndLogTimer = onStopAndLogTimer,
-                modifier = Modifier.weight(0.60f),
-            )
-            SubjectsTodayQuickStartPanel(
-                state = state,
-                subjects = subjects,
-                onQuickStartSubject = onQuickStartSubject,
-                modifier = Modifier
-                    .weight(0.40f)
-                    .fillMaxHeight(),
-            )
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .background(tokens.amoledBackground)
+            .testTag("timer_flip_clock_pane"),
+    ) {
+        val isCompactPane = maxWidth < 360.dp
+        val showSideSubjectsColumn = maxWidth >= 660.dp && !state.isFullScreenHomeClockMode
+        val tileSize = when {
+            maxWidth >= 560.dp && state.isFullScreenHomeClockMode -> FlipTileSize.HERO_FULLSCREEN
+            maxWidth >= 460.dp -> FlipTileSize.STANDARD_SPLIT
+            maxWidth >= 320.dp -> FlipTileSize.COMPACT_HOME
+            else -> FlipTileSize.NARROW_SPLIT
         }
-    } else {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = if (isCompactPane) 10.dp else 14.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            TimerInstrumentColumn(
-                state = state,
-                activeAccent = activeAccent,
-                compact = isCompactPane,
-                onSelectPomodoroStyle = onSelectPomodoroStyle,
-                onApplyPomodoroPreset = onApplyPomodoroPreset,
-                onSwitchPomodoroPhase = onSwitchPomodoroPhase,
-                onAddFiveMinutes = onAddFiveMinutes,
-                onRequestStartFromMainButton = onRequestStartFromMainButton,
-                onPauseResumeTimer = onPauseResumeTimer,
-                onResetTimer = onResetTimer,
-                onStopAndLogTimer = onStopAndLogTimer,
-                scrollable = false,
-            )
 
-            // High Timer % in 9:16 Portrait: Subjects Today stacked cleanly below the timer dial
-            if (showSubjectsPanel && !isWideLayout) {
-                SubjectsTodayQuickStartPanel(
-                    state = state,
+        if (showSideSubjectsColumn) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1.45f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    TimerCenterDeck(
+                        state = state,
+                        clockTickFlow = clockTickFlow,
+                        clockTheme = clockTheme,
+                        motionIntensity = motionIntensity,
+                        tileSize = tileSize,
+                        isCompactPane = false,
+                        onSelectMode = onSelectMode,
+                        onApplyPomodoroPreset = onApplyPomodoroPreset,
+                        onAdjustCustomTimerSeconds = onAdjustCustomTimerSeconds,
+                        onSwitchPomodoroPhase = onSwitchPomodoroPhase,
+                        onAddFiveMinutes = onAddFiveMinutes,
+                        onRequestStartFromMainButton = onRequestStartFromMainButton,
+                        onPauseResumeTimer = onPauseResumeTimer,
+                        onResetTimer = onResetTimer,
+                        onStopAndLogTimer = onStopAndLogTimer,
+                    )
+                }
+
+                SubjectsQuickStartSidebar(
                     subjects = subjects,
+                    todaySubjectSeconds = state.todaySubjectSeconds,
+                    activeSubjectName = state.activeSubjectName,
                     onQuickStartSubject = onQuickStartSubject,
-                    scrollable = false,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(0.85f)
+                        .fillMaxHeight(),
                 )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = if (isCompactPane) 10.dp else 16.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                TimerCenterDeck(
+                    state = state,
+                    clockTickFlow = clockTickFlow,
+                    clockTheme = clockTheme,
+                    motionIntensity = motionIntensity,
+                    tileSize = tileSize,
+                    isCompactPane = isCompactPane,
+                    onSelectMode = onSelectMode,
+                    onApplyPomodoroPreset = onApplyPomodoroPreset,
+                    onAdjustCustomTimerSeconds = onAdjustCustomTimerSeconds,
+                    onSwitchPomodoroPhase = onSwitchPomodoroPhase,
+                    onAddFiveMinutes = onAddFiveMinutes,
+                    onRequestStartFromMainButton = onRequestStartFromMainButton,
+                    onPauseResumeTimer = onPauseResumeTimer,
+                    onResetTimer = onResetTimer,
+                    onStopAndLogTimer = onStopAndLogTimer,
+                )
+
+                if (!isCompactPane && subjects.isNotEmpty() && !state.isFullScreenHomeClockMode) {
+                    SubjectsQuickStartHorizontalStrip(
+                        subjects = subjects,
+                        todaySubjectSeconds = state.todaySubjectSeconds,
+                        activeSubjectName = state.activeSubjectName,
+                        onQuickStartSubject = onQuickStartSubject,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun TimerInstrumentColumn(
+private fun TimerCenterDeck(
     state: StudyTimerGroupUiState,
-    activeAccent: Color,
-    compact: Boolean,
-    onSelectPomodoroStyle: (PomodoroRingStyle) -> Unit,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    clockTheme: ClockThemeId,
+    motionIntensity: MotionIntensity,
+    tileSize: FlipTileSize,
+    isCompactPane: Boolean,
+    onSelectMode: (StudyTimerMode) -> Unit,
     onApplyPomodoroPreset: (Int, Int) -> Unit,
+    onAdjustCustomTimerSeconds: (Int) -> Unit,
     onSwitchPomodoroPhase: () -> Unit,
     onAddFiveMinutes: () -> Unit,
     onRequestStartFromMainButton: () -> Unit,
     onPauseResumeTimer: () -> Unit,
     onResetTimer: () -> Unit,
     onStopAndLogTimer: () -> Unit,
-    scrollable: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val baseMod = if (scrollable) {
-        modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-    } else {
-        modifier.fillMaxWidth()
-    }
+    val accent = state.activeSubjectMood.accent
 
     Column(
-        modifier = baseMod,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (isCompactPane) 10.dp else 14.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        // Active Tag & Synced Lecture Pill
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Mode Selector Pill: Pomodoro vs Flip Stopwatch
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = tokens.carbonSurface,
+            border = BorderStroke(1.dp, tokens.hairlineRest),
         ) {
-            Surface(
-                shape = RoundedCornerShape(100.dp),
-                color = tokens.carbonSurface,
-                border = BorderStroke(1.dp, activeAccent.copy(alpha = 0.45f)),
+            Row(
+                modifier = Modifier.padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    Box(
+                StudyTimerMode.entries.forEach { mode ->
+                    val selected = state.mode == mode
+                    Surface(
+                        shape = RoundedCornerShape(9.dp),
+                        color = if (selected) tokens.primaryCta else tokens.carbonSurface,
                         modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(activeAccent),
+                            .clip(RoundedCornerShape(9.dp))
+                            .clickable(role = Role.Tab) { onSelectMode(mode) }
+                            .testTag("timer_mode_${mode.name.lowercase()}"),
+                    ) {
+                        Text(
+                            text = mode.label,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (selected) tokens.onPrimaryCta else tokens.inkSecondary,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(
+                                horizontal = if (isCompactPane) 10.dp else 16.dp,
+                                vertical = 7.dp,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Active Subject / Lecture Tag Chip
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = tokens.carbonSurface,
+            border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(accent),
+                )
+                Text(
+                    text = state.activeSubjectName ?: "Untagged Session",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = tokens.inkPrimary,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                state.syncedLectureTitle?.let { lec ->
+                    Icon(
+                        imageVector = Icons.Rounded.Link,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(13.dp),
                     )
                     Text(
-                        text = state.activeSubjectName ?: "No Subject Tag",
+                        text = lec,
                         style = MicroTagMono,
-                        color = tokens.inkPrimary,
+                        color = tokens.inkSecondary,
                         maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            if (state.syncedLectureTitle != null && !compact) {
+        }
+
+        // Physical 3D Split-Flap Flip Clock (Isolated Leaf Composable!)
+        FlipClockReadoutLeaf(
+            clockTickFlow = clockTickFlow,
+            clockTheme = clockTheme,
+            motionIntensity = motionIntensity,
+            tileSize = tileSize,
+            forceStopwatchFormat = state.mode == StudyTimerMode.STOPWATCH,
+            showSubLabels = !isCompactPane,
+            modifier = Modifier.testTag("timer_flip_clock_display"),
+        )
+
+        // Pomodoro Presets + Custom Min/Sec Stepper
+        if (state.mode == StudyTimerMode.POMODORO && !isCompactPane) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                listOf(25 to 5, 50 to 10, 90 to 15).forEach { (focus, brk) ->
+                    val sel = state.focusDurationMinutes == focus && state.breakDurationMinutes == brk
+                    Surface(
+                        shape = RoundedCornerShape(9.dp),
+                        color = if (sel) tokens.primaryCta else tokens.carbonSurface,
+                        border = BorderStroke(1.dp, if (sel) tokens.primaryCta else tokens.hairlineRest),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(9.dp))
+                            .clickable { onApplyPomodoroPreset(focus, brk) }
+                            .testTag("timer_preset_${focus}_${brk}"),
+                    ) {
+                        Text(
+                            text = "$focus/$brk",
+                            style = MicroTagMono.copy(fontWeight = FontWeight.Bold),
+                            color = if (sel) tokens.onPrimaryCta else tokens.inkSecondary,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+
+                // Switch Focus / Break Phase
                 Surface(
-                    shape = RoundedCornerShape(100.dp),
-                    color = tokens.carbonSurface,
-                    border = BorderStroke(1.dp, tokens.hairlineSubtle),
+                    shape = RoundedCornerShape(9.dp),
+                    color = tokens.slateElevated,
+                    border = BorderStroke(1.dp, tokens.hairlineRest),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9.dp))
+                        .clickable(onClick = onSwitchPomodoroPhase)
+                        .testTag("timer_switch_phase_button"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Link,
-                            contentDescription = null,
-                            tint = tokens.themeAccent,
-                            modifier = Modifier.size(12.dp),
+                            imageVector = Icons.Rounded.SwapHoriz,
+                            contentDescription = "Switch Focus and Break",
+                            tint = tokens.inkPrimary,
+                            modifier = Modifier.size(14.dp),
                         )
                         Text(
-                            text = state.syncedLectureTitle,
-                            style = MicroTagMono,
-                            color = tokens.inkSecondary,
+                            text = if (state.pomodoroPhase == PomodoroPhase.FOCUS) "Break" else "Focus",
+                            style = MicroTagMono.copy(fontWeight = FontWeight.SemiBold),
+                            color = tokens.inkPrimary,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
                         )
                     }
                 }
             }
-        }
 
-        // Visual Instrument: Pomodoro 4-Style Circle OR Calendar/Flip Stopwatch
-        if (state.mode == StudyTimerMode.POMODORO) {
-            PomodoroCircleInstrument(
-                style = state.pomodoroStyle,
-                progress = state.pomodoroProgress,
-                remainingSeconds = state.remainingSeconds,
-                phase = state.pomodoroPhase,
-                completedCycles = state.completedCycles,
-                accentColor = activeAccent,
-                dialSize = if (compact) 142.dp else 212.dp,
-                compact = compact,
-            )
-
-            if (!compact) {
-                // 4 Selectable Pomodoro Circle Designs
-                PomodoroStyleSelectorStrip(
-                    selectedStyle = state.pomodoroStyle,
-                    accentColor = activeAccent,
-                    onSelectStyle = onSelectPomodoroStyle,
-                )
-
-                // Quick Duration Presets + Custom steppers
+            // Custom Minutes / Seconds Adjuster Row (when idle)
+            if (!state.isTimerActiveSession) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    listOf(25 to 5, 50 to 10, 90 to 15).forEach { (f, b) ->
-                        val activePreset = state.focusDurationMinutes == f && state.breakDurationMinutes == b
-                        val pInt = remember { MutableInteractionSource() }
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (activePreset) tokens.slateElevated else tokens.carbonSurface,
-                            border = BorderStroke(1.dp, if (activePreset) activeAccent else tokens.hairlineSubtle),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("pomodoro_preset_${f}_$b")
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable(
-                                    interactionSource = pInt,
-                                    indication = ripple(),
-                                    role = Role.Button,
-                                    onClick = { onApplyPomodoroPreset(f, b) },
-                                ),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(vertical = 8.dp),
-                            ) {
-                                Text(
-                                    text = "$f / $b",
-                                    style = MicroTagMono,
-                                    color = if (activePreset) activeAccent else tokens.inkSecondary,
-                                )
-                            }
-                        }
-                    }
+                    CustomStepChip(label = "−5m", icon = Icons.Rounded.Remove) { onAdjustCustomTimerSeconds(-300) }
+                    CustomStepChip(label = "−30s", icon = Icons.Rounded.Remove) { onAdjustCustomTimerSeconds(-30) }
+                    CustomStepChip(label = "+30s", icon = Icons.Rounded.Add) { onAdjustCustomTimerSeconds(30) }
+                    CustomStepChip(label = "+5m", icon = Icons.Rounded.Add) { onAdjustCustomTimerSeconds(300) }
                 }
             }
-        } else {
-            CalendarFlipStopwatchView(
-                elapsedSeconds = state.elapsedSeconds,
-                accentColor = activeAccent,
-                compact = compact,
-            )
         }
 
-        // Primary Transport Controls (Start / Pause-Resume / Stop & Log / Reset / +5m / Phase)
+        // Primary Transport Controls (Start / Pause / Resume / Reset / +5m / Stop)
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (!state.isTimerActiveSession) {
-                val startInt = remember { MutableInteractionSource() }
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = tokens.primaryCta,
                     modifier = Modifier
-                        .testTag("timer_main_start_button")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(startInt, 0.96f)
                         .clip(RoundedCornerShape(14.dp))
+                        .minimumInteractiveComponentSize()
+                        .tactileScale()
                         .clickable(
-                            interactionSource = startInt,
-                            indication = ripple(),
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(color = tokens.onPrimaryCta),
                             role = Role.Button,
                             onClick = onRequestStartFromMainButton,
-                        ),
+                        )
+                        .testTag("timer_main_start_button"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = if (compact) 16.dp else 26.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (isCompactPane) 16.dp else 26.dp,
+                            vertical = 12.dp,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = "Start timer",
+                            contentDescription = "Start Study Timer",
                             tint = tokens.onPrimaryCta,
                             modifier = Modifier.size(20.dp),
                         )
                         Text(
                             text = "Start",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = tokens.onPrimaryCta,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }
             } else {
-                val pauseInt = remember { MutableInteractionSource() }
+                // Pause / Resume
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = if (state.isRunning) tokens.carbonSurface else tokens.primaryCta,
-                    border = if (state.isRunning) BorderStroke(1.dp, activeAccent) else null,
+                    color = tokens.primaryCta,
                     modifier = Modifier
-                        .testTag("timer_pause_resume_button")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(pauseInt, 0.96f)
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = pauseInt,
-                            indication = ripple(),
-                            role = Role.Button,
-                            onClick = onPauseResumeTimer,
-                        ),
+                        .minimumInteractiveComponentSize()
+                        .tactileScale()
+                        .clickable(role = Role.Button, onClick = onPauseResumeTimer)
+                        .testTag("timer_pause_resume_button"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = if (compact) 12.dp else 18.dp, vertical = 11.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (isCompactPane) 12.dp else 20.dp,
+                            vertical = 11.dp,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
                             imageVector = if (state.isRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (state.isRunning) "Pause timer" else "Resume timer",
-                            tint = if (state.isRunning) activeAccent else tokens.onPrimaryCta,
+                            contentDescription = if (state.isRunning) "Pause" else "Resume",
+                            tint = tokens.onPrimaryCta,
                             modifier = Modifier.size(18.dp),
                         )
+                        if (!isCompactPane) {
+                            Text(
+                                text = if (state.isRunning) "Pause" else "Resume",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = tokens.onPrimaryCta,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+
+                // +5m quick boost (Pomodoro)
+                if (state.mode == StudyTimerMode.POMODORO && !isCompactPane) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = tokens.carbonSurface,
+                        border = BorderStroke(1.dp, tokens.hairlineRest),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .minimumInteractiveComponentSize()
+                            .clickable(role = Role.Button, onClick = onAddFiveMinutes)
+                            .testTag("timer_add_five_min_button"),
+                    ) {
                         Text(
-                            text = if (state.isRunning) "Pause" else "Resume",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (state.isRunning) activeAccent else tokens.onPrimaryCta,
+                            text = "+5m",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = tokens.inkPrimary,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
                         )
                     }
                 }
 
-                val stopInt = remember { MutableInteractionSource() }
+                // Stop & Log (exits Full-Screen Home Clock mode back to Home cleanly!)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.16f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    color = AccentMood.EMERALD.accent.copy(alpha = 0.16f),
+                    border = BorderStroke(1.dp, AccentMood.EMERALD.accent.copy(alpha = 0.55f)),
                     modifier = Modifier
-                        .testTag("timer_stop_and_log_button")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(stopInt, 0.96f)
                         .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = stopInt,
-                            indication = ripple(),
-                            role = Role.Button,
-                            onClick = onStopAndLogTimer,
-                        ),
+                        .minimumInteractiveComponentSize()
+                        .tactileScale()
+                        .clickable(role = Role.Button, onClick = onStopAndLogTimer)
+                        .testTag("timer_stop_and_log_button"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = if (compact) 11.dp else 16.dp, vertical = 11.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (isCompactPane) 12.dp else 18.dp,
+                            vertical = 11.dp,
+                        ),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Stop,
-                            contentDescription = "Finish and log session",
-                            tint = MaterialTheme.colorScheme.error,
+                            contentDescription = "Stop and Log Session",
+                            tint = AccentMood.EMERALD.accent,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text(
-                            text = "Finish",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        }
-
-        // Secondary controls (+5m, Switch Focus/Break, Reset)
-        if (!compact) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (state.mode == StudyTimerMode.POMODORO) {
-                    SmallTimerControlPill(
-                        label = "+5m",
-                        icon = Icons.Rounded.Add,
-                        testTag = "timer_add_5m_button",
-                        onClick = onAddFiveMinutes,
-                    )
-                    SmallTimerControlPill(
-                        label = if (state.pomodoroPhase == PomodoroPhase.FOCUS) "Break" else "Focus",
-                        icon = Icons.Rounded.SwapHoriz,
-                        testTag = "timer_switch_phase_button",
-                        onClick = onSwitchPomodoroPhase,
-                    )
-                }
-                SmallTimerControlPill(
-                    label = "Reset",
-                    icon = Icons.Rounded.Refresh,
-                    testTag = "timer_reset_button",
-                    onClick = onResetTimer,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SubjectsTodayQuickStartPanel(
-    state: StudyTimerGroupUiState,
-    subjects: List<VaultSubjectNode>,
-    onQuickStartSubject: (VaultSubjectNode) -> Unit,
-    scrollable: Boolean = true,
-    modifier: Modifier = Modifier,
-) {
-    val tokens = GhickinTokens.colors
-    val contentMod = if (scrollable) {
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(14.dp)
-    } else {
-        Modifier
-            .fillMaxWidth()
-            .padding(14.dp)
-    }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = tokens.obsidianSurface,
-        border = BorderStroke(1.dp, tokens.hairlineRest),
-        modifier = modifier.testTag("timer_subjects_today_panel"),
-    ) {
-        Column(
-            modifier = contentMod,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "SUBJECTS · STUDIED TODAY",
-                        style = MicroTagMono,
-                        color = tokens.themeAccent,
-                    )
-                    Text(
-                        text = "Tap any subject to start immediately",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = tokens.inkSecondary,
-                    )
-                }
-                Text(
-                    text = formatDurationCompactHm(state.todayTotalStudySeconds),
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontFeatureSettings = "tnum",
-                    ),
-                    color = tokens.inkPrimary,
-                )
-            }
-
-            subjects.forEach { subj ->
-                val studiedSec = state.liveSubjectSecondsToday(subj.name)
-                val isActive = state.isTimerActiveSession && state.activeSubjectName.equals(subj.name, ignoreCase = true)
-                val subjInt = remember { MutableInteractionSource() }
-                val accent = subj.accentMood.accent
-
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isActive) accent.copy(alpha = 0.14f) else tokens.carbonSurface,
-                    border = BorderStroke(
-                        1.dp,
-                        if (isActive) accent else tokens.hairlineSubtle,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("timer_quick_subject_${subj.id}")
-                        .minimumInteractiveComponentSize()
-                        .tactileScale(subjInt, 0.97f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable(
-                            interactionSource = subjInt,
-                            indication = ripple(color = accent.copy(alpha = 0.2f)),
-                            role = Role.Button,
-                            onClick = { onQuickStartSubject(subj) },
-                        ),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(9.dp)
-                                .clip(CircleShape)
-                                .background(accent),
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
+                        if (!isCompactPane) {
                             Text(
-                                text = subj.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = tokens.inkPrimary,
+                                text = "Stop",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = AccentMood.EMERALD.accent,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = if (isActive) "LIVE · SYNCED TO GROUP" else "${subj.chapters.size} chapters in batch",
-                                style = MicroTagMono,
-                                color = if (isActive) accent else tokens.inkMuted,
-                                maxLines = 1,
-                            )
-                        }
-                        Text(
-                            text = formatDurationHms(studiedSec),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.SemiBold,
-                                fontFeatureSettings = "tnum",
-                            ),
-                            color = if (isActive) accent else tokens.inkPrimary,
-                        )
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(if (isActive) accent else tokens.slateElevated),
-                        ) {
-                            Icon(
-                                imageVector = if (isActive) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = "Start ${subj.name} timer",
-                                tint = if (isActive) Color.Black else tokens.inkPrimary,
-                                modifier = Modifier.size(16.dp),
+                                softWrap = false,
                             )
                         }
                     }
                 }
             }
 
-            // Also show auto-logged Revision & Flashcards totals for today
-            val revSec = state.todaySubjectSeconds["Revision"] ?: 0
-            val fcSec = state.todaySubjectSeconds["Flashcards"] ?: 0
-            if (revSec > 0 || fcSec > 0) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // Reset button
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = tokens.carbonSurface,
+                border = BorderStroke(1.dp, tokens.hairlineRest),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .minimumInteractiveComponentSize()
+                    .clickable(role = Role.Button, onClick = onResetTimer)
+                    .testTag("timer_reset_button"),
+            ) {
+                Box(
+                    modifier = Modifier.padding(11.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    AutoTagTodayChip(
-                        label = "Revision (Auto)",
-                        seconds = revSec,
-                        accent = AccentMood.EMERALD.accent,
-                        modifier = Modifier.weight(1f),
-                    )
-                    AutoTagTodayChip(
-                        label = "Flashcards (Auto)",
-                        seconds = fcSec,
-                        accent = AccentMood.AMBER.accent,
-                        modifier = Modifier.weight(1f),
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "Reset Timer",
+                        tint = tokens.inkSecondary,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
@@ -1225,223 +1058,323 @@ private fun SubjectsTodayQuickStartPanel(
 }
 
 @Composable
-private fun AutoTagTodayChip(
+private fun CustomStepChip(
     label: String,
-    seconds: Int,
-    accent: Color,
-    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
 ) {
     val tokens = GhickinTokens.colors
     Surface(
-        shape = RoundedCornerShape(11.dp),
-        color = tokens.carbonSurface,
+        shape = RoundedCornerShape(8.dp),
+        color = tokens.obsidianSurface,
         border = BorderStroke(1.dp, tokens.hairlineSubtle),
-        modifier = modifier,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(text = label, style = MicroTagMono, color = accent, maxLines = 1)
+            Icon(icon, contentDescription = null, tint = tokens.inkMuted, modifier = Modifier.size(12.dp))
             Text(
-                text = formatDurationCompactHm(seconds),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontFeatureSettings = "tnum",
-                ),
-                color = tokens.inkPrimary,
+                text = label,
+                style = MicroTagMono,
+                color = tokens.inkSecondary,
+                maxLines = 1,
+                softWrap = false,
             )
         }
     }
 }
 
 @Composable
-private fun SplitDragHandle(
-    isHorizontalSplit: Boolean,
-    currentRatioLabel: String,
-    isDragging: Boolean,
-    onDragStart: () -> Unit,
-    onDragDelta: (Float) -> Unit,
-    onDragEnd: () -> Unit,
-    onCycleSnap: () -> Unit,
+private fun SubjectsQuickStartSidebar(
+    subjects: List<VaultSubjectNode>,
+    todaySubjectSeconds: Map<String, Int>,
+    activeSubjectName: String?,
+    onQuickStartSubject: (VaultSubjectNode) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val tokens = GhickinTokens.colors
-    val handleBg = if (isDragging) tokens.themeAccent.copy(alpha = 0.25f) else tokens.obsidianSurface
-    val pillColor = if (isDragging) tokens.themeAccent else tokens.inkMuted
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = tokens.obsidianSurface,
+        border = BorderStroke(1.dp, tokens.hairlineRest),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "TODAY BY SUBJECT",
+                    style = MicroTagMono.copy(fontWeight = FontWeight.Bold),
+                    color = tokens.inkSecondary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                Text(
+                    text = "Tap to start",
+                    style = MicroTagMono,
+                    color = tokens.inkMuted,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                items(items = subjects, key = { it.id }) { subject ->
+                    val sec = todaySubjectSeconds[subject.name] ?: 0
+                    val isCurrent = activeSubjectName.equals(subject.name, ignoreCase = true)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isCurrent) subject.accentMood.accent.copy(alpha = 0.14f) else tokens.carbonSurface,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isCurrent) subject.accentMood.accent.copy(alpha = 0.55f) else tokens.hairlineSubtle,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .tactileScale()
+                            .clickable(role = Role.Button) { onQuickStartSubject(subject) }
+                            .testTag("timer_subject_quick_${subject.id}"),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(subject.accentMood.accent),
+                            )
+                            Text(
+                                text = subject.name,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = tokens.inkPrimary,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = formatDurationCompactHm(sec),
+                                style = MicroTagMono.copy(fontWeight = FontWeight.Bold),
+                                color = subject.accentMood.accent,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubjectsQuickStartHorizontalStrip(
+    subjects: List<VaultSubjectNode>,
+    todaySubjectSeconds: Map<String, Int>,
+    activeSubjectName: String?,
+    onQuickStartSubject: (VaultSubjectNode) -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "QUICK-START BY SUBJECT",
+            style = MicroTagMono,
+            color = tokens.inkMuted,
+            maxLines = 1,
+            softWrap = false,
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(items = subjects, key = { it.id }) { subject ->
+                val sec = todaySubjectSeconds[subject.name] ?: 0
+                val isCurrent = activeSubjectName.equals(subject.name, ignoreCase = true)
+                Surface(
+                    shape = RoundedCornerShape(11.dp),
+                    color = if (isCurrent) subject.accentMood.accent.copy(alpha = 0.16f) else tokens.carbonSurface,
+                    border = BorderStroke(
+                        1.dp,
+                        if (isCurrent) subject.accentMood.accent.copy(alpha = 0.55f) else tokens.hairlineRest,
+                    ),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(11.dp))
+                        .clickable { onQuickStartSubject(subject) },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(subject.accentMood.accent),
+                        )
+                        Text(
+                            text = subject.name,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = tokens.inkPrimary,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                        Text(
+                            text = formatDurationCompactHm(sec),
+                            style = MicroTagMono,
+                            color = tokens.inkMuted,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TactileSplitHandle(
+    isVerticalDivider: Boolean,
+    isDragging: Boolean,
+    onDragStart: () -> Unit,
+    onDragDeltaPx: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    val tokens = GhickinTokens.colors
+    val handleBg = if (isDragging) tokens.themeAccent.copy(alpha = 0.16f) else tokens.obsidianSurface
+    val pillColor = if (isDragging) tokens.themeAccent else tokens.inkMuted.copy(alpha = 0.55f)
 
     Box(
-        contentAlignment = Alignment.Center,
-        modifier = (if (isHorizontalSplit) {
-            Modifier
-                .fillMaxHeight()
-                .width(24.dp)
-        } else {
-            Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-        })
+        modifier = Modifier
+            .then(
+                if (isVerticalDivider) {
+                    Modifier
+                        .width(18.dp)
+                        .fillMaxHeight()
+                } else {
+                    Modifier
+                        .height(20.dp)
+                        .fillMaxWidth()
+                },
+            )
             .background(handleBg)
-            .testTag("timer_split_drag_handle")
-            .pointerInput(isHorizontalSplit) {
+            .pointerInput(isVerticalDivider) {
                 detectDragGestures(
                     onDragStart = { onDragStart() },
                     onDragEnd = { onDragEnd() },
                     onDragCancel = { onDragEnd() },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        onDragDelta(if (isHorizontalSplit) dragAmount.x else dragAmount.y)
+                        onDragDeltaPx(if (isVerticalDivider) dragAmount.x else dragAmount.y)
                     },
                 )
             }
-            .clickable(onClick = onCycleSnap),
+            .testTag("timer_split_drag_handle"),
+        contentAlignment = Alignment.Center,
     ) {
-        // Center hairline
-        Box(
-            modifier = if (isHorizontalSplit) {
-                Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(tokens.hairlineRest)
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(tokens.hairlineRest)
-            },
-        )
-        // Tactile center grip pill
-        Surface(
-            shape = RoundedCornerShape(100.dp),
-            color = tokens.carbonSurface,
-            border = BorderStroke(1.dp, if (isDragging) tokens.themeAccent else tokens.hairlineRest),
-        ) {
+        if (isVerticalDivider) {
             Box(
-                contentAlignment = Alignment.Center,
-                modifier = if (isHorizontalSplit) {
-                    Modifier.padding(horizontal = 3.dp, vertical = 14.dp)
-                } else {
-                    Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-                },
-            ) {
-                if (isHorizontalSplit) {
-                    Box(
-                        modifier = Modifier
-                            .width(4.dp)
-                            .height(26.dp)
-                            .clip(RoundedCornerShape(100.dp))
-                            .background(pillColor),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.DragHandle,
-                        contentDescription = "Drag split screen ($currentRatioLabel)",
-                        tint = pillColor,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SplitRatioQuickStrip(
-    activeRatio: TimerSplitRatio,
-    onSelectRatio: (TimerSplitRatio) -> Unit,
-) {
-    val tokens = GhickinTokens.colors
-
-    Surface(
-        color = tokens.obsidianSurface,
-        border = BorderStroke(1.dp, tokens.hairlineSubtle),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = "SPLIT",
-                style = MicroTagMono,
-                color = tokens.inkMuted,
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(42.dp)
+                    .clip(CircleShape)
+                    .background(pillColor),
             )
-            TimerSplitRatio.entries.forEach { ratio ->
-                val selected = ratio == activeRatio
-                val rInt = remember { MutableInteractionSource() }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (selected) tokens.themeAccent.copy(alpha = 0.18f) else tokens.carbonSurface,
-                    border = BorderStroke(1.dp, if (selected) tokens.themeAccent else tokens.hairlineSubtle),
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .testTag("timer_ratio_${ratio.label.replace(":", "_")}")
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(
-                            interactionSource = rInt,
-                            indication = ripple(),
-                            role = Role.RadioButton,
-                            onClick = { onSelectRatio(ratio) },
-                        ),
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(vertical = 6.dp),
-                    ) {
-                        Text(
-                            text = ratio.label,
-                            style = MicroTagMono.copy(fontSize = 10.sp),
-                            color = if (selected) tokens.themeAccent else tokens.inkSecondary,
-                            maxLines = 1,
-                        )
-                    }
-                }
+                        .width(42.dp)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(pillColor),
+                )
+                Icon(
+                    imageVector = Icons.Rounded.DragIndicator,
+                    contentDescription = "Drag to resize split panes",
+                    tint = pillColor,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SmallTimerControlPill(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    testTag: String,
-    onClick: () -> Unit,
+private fun FloatingGroupLiveClockChip(
+    state: StudyTimerGroupUiState,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    clockTheme: ClockThemeId,
+    onRestoreSplit: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val tokens = GhickinTokens.colors
-    val interaction = remember { MutableInteractionSource() }
+    val palette = clockTheme.palette
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = tokens.carbonSurface,
-        border = BorderStroke(1.dp, tokens.hairlineSubtle),
-        modifier = Modifier
-            .testTag(testTag)
-            .tactileScale(interaction, 0.95f)
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(
-                interactionSource = interaction,
-                indication = ripple(),
-                role = Role.Button,
-                onClick = onClick,
-            ),
+        shape = RoundedCornerShape(12.dp),
+        color = palette.housingBackground,
+        border = BorderStroke(1.dp, palette.accentColor.copy(alpha = 0.65f)),
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onRestoreSplit)
+            .testTag("group_floating_live_clock"),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = tokens.inkSecondary,
-                modifier = Modifier.size(14.dp),
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(palette.accentColor),
+            )
+            LiveClockTickTextLeaf(
+                clockTickFlow = clockTickFlow,
+                textProvider = { tick -> formatDurationHms(tick.displaySeconds) },
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                ),
+                color = palette.digitInk,
             )
             Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = tokens.inkSecondary,
+                text = state.activeSubjectName ?: "Timer",
+                style = MicroTagMono,
+                color = palette.subLabelInk,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

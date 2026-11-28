@@ -70,6 +70,8 @@ import com.example.R
 import com.example.model.DailyFlashcardItem
 import com.example.model.DailyRevisionTakeaway
 import com.example.model.HomeCommandState
+import com.example.model.LiveClockTick
+import com.example.model.TimerSessionSource
 import com.example.ui.components.ObsidianCard
 import com.example.ui.components.StaggeredEntrance
 import com.example.ui.components.tactileScale
@@ -83,13 +85,16 @@ import com.example.ui.theme.MicroTagMono
 import com.example.ui.theme.MonoBadgeStyle
 import com.example.ui.theme.MonoMetricMedium
 import com.example.ui.theme.rememberScreenLayoutMetrics
+import com.example.ui.timer.AutoTimerPillReadoutLeaf
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun TodayRevisionPage(
     state: HomeCommandState,
     appTheme: AppThemeId,
     isWideLayout: Boolean,
-    autoTimerBadgeText: String? = null,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    isAutoTimerActive: Boolean = false,
     onBackToHome: () -> Unit,
     onMarkComplete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -119,7 +124,9 @@ fun TodayRevisionPage(
             DailyPageTopBar(
                 title = stringResource(R.string.home_today_revision_title),
                 subtitle = state.todayRevisionGeneratedLabel,
-                autoTimerBadgeText = autoTimerBadgeText,
+                clockTickFlow = clockTickFlow,
+                autoTimerSource = if (isAutoTimerActive) TimerSessionSource.AUTO_REVISION else null,
+                autoTimerPrefix = "AUTO · Revision",
                 onBackToHome = onBackToHome,
                 backButtonTag = "today_revision_back_button",
             )
@@ -216,7 +223,8 @@ fun TodayFlashcardsPage(
     state: HomeCommandState,
     appTheme: AppThemeId,
     isWideLayout: Boolean,
-    autoTimerBadgeText: String? = null,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    isAutoTimerActive: Boolean = false,
     onBackToHome: () -> Unit,
     onFlipCard: () -> Unit,
     onStepCard: (Int) -> Unit,
@@ -252,7 +260,9 @@ fun TodayFlashcardsPage(
             DailyPageTopBar(
                 title = stringResource(R.string.home_today_flashcards_title),
                 subtitle = state.todayRevisionGeneratedLabel,
-                autoTimerBadgeText = autoTimerBadgeText,
+                clockTickFlow = clockTickFlow,
+                autoTimerSource = if (isAutoTimerActive) TimerSessionSource.AUTO_FLASHCARDS else null,
+                autoTimerPrefix = "AUTO · Flashcards",
                 onBackToHome = onBackToHome,
                 backButtonTag = "today_flashcards_back_button",
             )
@@ -464,7 +474,9 @@ fun TodayFlashcardsPage(
 private fun DailyPageTopBar(
     title: String,
     subtitle: String,
-    autoTimerBadgeText: String? = null,
+    clockTickFlow: StateFlow<LiveClockTick>,
+    autoTimerSource: TimerSessionSource? = null,
+    autoTimerPrefix: String = "",
     onBackToHome: () -> Unit,
     backButtonTag: String,
 ) {
@@ -529,8 +541,8 @@ private fun DailyPageTopBar(
             )
         }
 
-        // Live Automatic Count-Up Timer Badge (starts at 00:00 on open, logs automatically on exit)
-        if (autoTimerBadgeText != null) {
+        // Live Automatic Count-Up Timer Badge (isolated leaf so parent page never recomposes per tick)
+        if (autoTimerSource != null) {
             Surface(
                 shape = RoundedCornerShape(100.dp),
                 color = tokens.themeAccent.copy(alpha = 0.15f),
@@ -548,11 +560,12 @@ private fun DailyPageTopBar(
                             .clip(CircleShape)
                             .background(emerald),
                     )
-                    Text(
-                        text = autoTimerBadgeText,
+                    AutoTimerPillReadoutLeaf(
+                        clockTickFlow = clockTickFlow,
+                        expectedSource = autoTimerSource,
+                        prefix = autoTimerPrefix,
                         style = MicroTagMono,
                         color = tokens.inkPrimary,
-                        maxLines = 1,
                     )
                 }
             }

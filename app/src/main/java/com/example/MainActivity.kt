@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.navigation.Phase163Actions
+import com.example.ui.navigation.Phase164Actions
 import com.example.ui.navigation.WorkspaceShell
 import com.example.ui.theme.GhickinTheme
 import com.example.viewmodel.WorkspaceViewModel
@@ -93,12 +94,60 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
+            val phase164Actions = remember(workspaceViewModel) {
+                Phase164Actions(
+                    onSelectClockTheme = workspaceViewModel::selectClockTheme,
+                    onSelectMotionIntensity = workspaceViewModel::selectMotionIntensity,
+                    onSelectLayoutDensity = workspaceViewModel::selectLayoutDensity,
+                    onAdjustDefaultFocusMinutes = workspaceViewModel::adjustDefaultFocusMinutes,
+                    onAdjustDefaultBreakMinutes = workspaceViewModel::adjustDefaultBreakMinutes,
+                    onToggleAutoLogStudySessions = workspaceViewModel::toggleAutoLogStudySessions,
+                    onSelectSubjectIndicatorStyle = workspaceViewModel::selectSubjectIndicatorStyle,
+                    onAdjustManualTaskEditCap = workspaceViewModel::adjustManualTaskEditCap,
+                    onRequestResetDemoState = workspaceViewModel::requestResetDemoState,
+                    onConfirmResetDemoState = workspaceViewModel::confirmResetDemoState,
+                    onDismissResetDemoDialog = workspaceViewModel::dismissResetDemoDialog,
+                    onOpenHomeClockTagPicker = workspaceViewModel::openHomeClockTagPicker,
+                    onDismissHomeClockTagPicker = workspaceViewModel::dismissHomeClockTagPicker,
+                    onSelectHomeClockBatch = workspaceViewModel::selectHomeClockBatch,
+                    onSelectHomeClockSubject = workspaceViewModel::selectHomeClockSubject,
+                    onSelectHomeClockChapter = workspaceViewModel::selectHomeClockChapter,
+                    onSelectHomeClockLecture = workspaceViewModel::selectHomeClockLecture,
+                    onConfirmHomeClockTagSelection = workspaceViewModel::confirmHomeClockTagSelection,
+                    onStartHomeClockUntagged = workspaceViewModel::startHomeClockUntagged,
+                    onAdjustCustomTimerSeconds = workspaceViewModel::adjustCustomTimerSeconds,
+                    onSetSplitPosture = workspaceViewModel::setSplitPosture,
+                    onToggleSplitView = workspaceViewModel::toggleSplitView,
+                    onInspectYptMember = workspaceViewModel::inspectYptMember,
+                    onSendSilentBoost = workspaceViewModel::sendSilentBoost,
+                    onOpenAllowedAppsSheet = workspaceViewModel::openAllowedAppsSheet,
+                    onCloseAllowedAppsSheet = workspaceViewModel::closeAllowedAppsSheet,
+                    onToggleAllowedApp = workspaceViewModel::toggleAllowedApp,
+                    onSetPlannerAiSidePanelOpen = workspaceViewModel::setPlannerAiSidePanelOpen,
+                    onOpenSimulatedRagSheet = workspaceViewModel::openSimulatedRagSheet,
+                    onCloseSimulatedRagSheet = workspaceViewModel::closeSimulatedRagSheet,
+                    onOpenAppealForBlock = workspaceViewModel::openAppealForBlock,
+                    onSelectAppealPresetReason = workspaceViewModel::selectAppealPresetReason,
+                    onUpdateAppealCustomReason = workspaceViewModel::updateAppealCustomReason,
+                    onSubmitAppeal = workspaceViewModel::submitAppeal,
+                    onApplyApprovedAppeal = workspaceViewModel::applyApprovedAppeal,
+                    onDismissAppeal = workspaceViewModel::dismissAppeal,
+                    onTogglePlannerUserTaskCompleted = workspaceViewModel::togglePlannerUserTaskCompleted,
+                    onAddPlannerUserTask = workspaceViewModel::addPlannerUserTask,
+                    onManualEditPlannerUserTask = workspaceViewModel::manualEditPlannerUserTask,
+                    onRequestAiReauthorizeManualEdits = workspaceViewModel::requestAiReauthorizeManualEdits,
+                    onUpdatePlannerAiSideComposer = workspaceViewModel::updatePlannerAiSideComposer,
+                    onSendPlannerAiSidePrompt = workspaceViewModel::sendPlannerAiSidePrompt,
+                )
+            }
+
             GhickinTheme(
                 appTheme = uiState.appTheme,
                 accentMood = uiState.accentMood,
             ) {
                 WorkspaceShell(
                     uiState = uiState,
+                    clockTickFlow = workspaceViewModel.clockTick,
                     onSelectTab = workspaceViewModel::selectTab,
                     onSelectAppTheme = workspaceViewModel::selectAppTheme,
                     onOpenSettings = workspaceViewModel::openSettings,
@@ -187,6 +236,7 @@ class MainActivity : ComponentActivity() {
                     onRetakeFullQuiz = workspaceViewModel::retakeFullQuizArena,
                     onStudyWeakChapterInTutor = workspaceViewModel::jumpFromWeakTopicToTutor,
                     phase163Actions = phase163Actions,
+                    phase164Actions = phase164Actions,
                     onNavigateBackToHome = workspaceViewModel::navigateBackToHome,
                 )
             }

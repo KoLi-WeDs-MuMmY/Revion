@@ -2,12 +2,16 @@ package com.example.data.mock
 
 import com.example.model.AppRagFileId
 import com.example.model.DailyTelemetryEntry
+import com.example.model.PlannerAiSideMessage
+import com.example.model.PlannerHeatmapDay
 import com.example.model.PlannerRag1State
 import com.example.model.PlannerRag2State
+import com.example.model.PlannerUserTask
 import com.example.model.PomodoroRingStyle
 import com.example.model.RagAiOptimizationResult
 import com.example.model.RawDailyStudyPoint
 import com.example.model.SettingsRagHubState
+import com.example.model.SplitPosture
 import com.example.model.StandalonePlannerTask
 import com.example.model.StandalonePlannerUiState
 import com.example.model.StudyLogRagState
@@ -17,6 +21,7 @@ import com.example.model.StudyTimerMode
 import com.example.model.TimerSessionSource
 import com.example.model.TimerSplitRatio
 import com.example.model.WorkspaceUiState
+import com.example.model.YptAllowedApp
 import com.example.model.YptGroupMember
 import com.example.model.YptMemberStatus
 import com.example.model.YptStudyGroup
@@ -133,6 +138,86 @@ object Phase163MockData {
             lastGeneratedLabel = "App-generated via AI · Today 06:30",
         )
 
+        val heatmap28 = listOf(
+            PlannerHeatmapDay(1, "Oct 31", 4.2f, 75, 2),
+            PlannerHeatmapDay(2, "Nov 01", 5.6f, 85, 3),
+            PlannerHeatmapDay(3, "Nov 02", 2.1f, 45, 1),
+            PlannerHeatmapDay(4, "Nov 03", 6.4f, 92, 4),
+            PlannerHeatmapDay(5, "Nov 04", 5.1f, 80, 3),
+            PlannerHeatmapDay(6, "Nov 05", 4.8f, 78, 2),
+            PlannerHeatmapDay(7, "Nov 06", 6.9f, 95, 4),
+            PlannerHeatmapDay(8, "Nov 07", 3.2f, 60, 1),
+            PlannerHeatmapDay(9, "Nov 08", 4.1f, 72, 2),
+            PlannerHeatmapDay(10, "Nov 09", 5.2f, 82, 3),
+            PlannerHeatmapDay(11, "Nov 10", 3.8f, 65, 2),
+            PlannerHeatmapDay(12, "Nov 11", 5.6f, 86, 3),
+            PlannerHeatmapDay(13, "Nov 12", 6.1f, 90, 3),
+            PlannerHeatmapDay(14, "Nov 13", 6.4f, 92, 4),
+            PlannerHeatmapDay(15, "Nov 14", 3.2f, 58, 1),
+            PlannerHeatmapDay(16, "Nov 15", 5.0f, 80, 3),
+            PlannerHeatmapDay(17, "Nov 16", 5.8f, 88, 3),
+            PlannerHeatmapDay(18, "Nov 17", 6.5f, 94, 4),
+            PlannerHeatmapDay(19, "Nov 18", 7.1f, 96, 4),
+            PlannerHeatmapDay(20, "Nov 19", 5.9f, 88, 3),
+            PlannerHeatmapDay(21, "Nov 20", 4.6f, 76, 2),
+            PlannerHeatmapDay(22, "Nov 21", 7.75f, 100, 4),
+            PlannerHeatmapDay(23, "Nov 22", 1.85f, 40, 1),
+            PlannerHeatmapDay(24, "Nov 23", 5.5f, 84, 3),
+            PlannerHeatmapDay(25, "Nov 24", 6.2f, 90, 3),
+            PlannerHeatmapDay(26, "Nov 25", 5.9f, 86, 3),
+            PlannerHeatmapDay(27, "Nov 26", 6.4f, 92, 4),
+            PlannerHeatmapDay(28, "Nov 27", 6.8f, 94, 4),
+        )
+
+        val userTasks = listOf(
+            PlannerUserTask(
+                id = "utask_1",
+                title = "Solve 15 Gauss's Law PYQ numericals",
+                subjectName = "Physics",
+                accentMood = AccentMood.CYAN,
+                slottedTimeWindow = "11:15 – 12:00",
+                durationMinutes = 45,
+                isCompleted = true,
+                aiSlotNote = "AI-slotted right after Physics derivation block",
+            ),
+            PlannerUserTask(
+                id = "utask_2",
+                title = "Revise Arrhenius ln(k) vs 1/T slope traps",
+                subjectName = "Chemistry",
+                accentMood = AccentMood.VIOLET,
+                slottedTimeWindow = "16:15 – 16:45",
+                durationMinutes = 30,
+                isCompleted = false,
+                aiSlotNote = "AI-placed in light afternoon review pocket",
+            ),
+            PlannerUserTask(
+                id = "utask_3",
+                title = "Attempt 10 King's Property integral drills",
+                subjectName = "Maths",
+                accentMood = AccentMood.AMBER,
+                slottedTimeWindow = "20:05 – 20:30",
+                durationMinutes = 25,
+                isCompleted = false,
+                aiSlotNote = "AI-paired with evening Maths weak-topic sprint",
+            ),
+            PlannerUserTask(
+                id = "utask_4",
+                title = "Check Okazaki fragment & ligase flashcards",
+                subjectName = "Biology",
+                accentMood = AccentMood.EMERALD,
+                slottedTimeWindow = "21:25 – 21:45",
+                durationMinutes = 20,
+                isCompleted = false,
+                aiSlotNote = "Low-load recall wind-down before sleep cutoff",
+            ),
+        )
+
+        val initialAiSideMessages = createZeroContextPlannerGreeting(
+            sessionNumber = 1,
+            rag1 = rag1,
+            rag2 = rag2,
+        )
+
         return StandalonePlannerUiState(
             isAiEnabled = true,
             isScheduleConfirmed = false,
@@ -143,8 +228,43 @@ object Phase163MockData {
             tasks = tasks,
             pendingGate = null,
             statusNotice = null,
+            isAiSidePanelOpen = false,
+            showSimulatedRagSheet = false,
+            heatmapDays = heatmap28,
+            activeAppeal = null,
+            userTasks = userTasks,
+            manualEditsUsed = 0,
+            manualEditCap = 3,
+            isManualTaskEditingLocked = false,
+            aiInterventionBanner = null,
+            aiSideMessages = initialAiSideMessages,
+            aiSideComposerText = "",
         )
     }
+
+    fun createZeroContextPlannerGreeting(
+        sessionNumber: Int,
+        rag1: PlannerRag1State,
+        rag2: PlannerRag2State,
+    ): List<PlannerAiSideMessage> {
+        return listOf(
+            PlannerAiSideMessage(
+                id = "ai_sys_$sessionNumber",
+                isUser = false,
+                text = "Fresh Window #$sessionNumber · 0 prior chat turns carried over. Hydrated strictly from simulated RAG(1) (${rag1.oneMonthAvgStudyHours}h/d study avg) & RAG(2) peak focus (${rag2.peakFocusWindow}). Tap Appeal on any block or ask me to re-balance your plan.",
+                tagLabel = "ZERO-CONTEXT · SIM RAG(1)+RAG(2)",
+            ),
+        )
+    }
+
+    fun createInitialYptAllowedApps(): List<YptAllowedApp> = listOf(
+        YptAllowedApp("app_vault", "GHICKIN Vault", "Study Archive", "vault", true),
+        YptAllowedApp("app_calc", "Calculator", "Scientific", "calculator", true),
+        YptAllowedApp("app_dict", "Dictionary", "Reference", "dictionary", true),
+        YptAllowedApp("app_pdf", "Notes PDF", "Reader", "pdf", true),
+        YptAllowedApp("app_formula", "Formula Deck", "Quick Sheet", "formula", true),
+        YptAllowedApp("app_music", "Lo-Fi Focus", "Audio", "audio", false),
+    )
 
     fun createInitialTimerGroupState(): StudyTimerGroupUiState {
         // Unoptimized raw daily study history (20 days) so true Highest & Lowest day records stay intact
@@ -391,6 +511,12 @@ object Phase163MockData {
             joinedGroupId = groups.first().id,
             userStatus = YptMemberStatus.IDLE,
             userChapterTag = "Gauss's Law & Flux",
+            splitPosture = SplitPosture.FULL_TIMER,
+            isFullScreenHomeClockMode = false,
+            allowedApps = createInitialYptAllowedApps(),
+            showAllowedAppsSheet = false,
+            inspectedMemberId = null,
+            silentBoostCounts = mapOf("mem_aarav" to 3, "mem_diya" to 5),
         )
     }
 
